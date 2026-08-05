@@ -1,0 +1,13 @@
+{
+  "name": "edgehealth-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "http-server . -p 5173 -c-1",
+    "start": "npm run dev"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}
