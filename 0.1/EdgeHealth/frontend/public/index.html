@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EdgeHealth - Teste</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 24px;
+        background: #f5f7fa;
+        color: #333;
+      }
+      h1 {
+        color: #0077cc;
+      }
+      .card {
+        background: #fff;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 20px;
+        max-width: 700px;
+        margin: 0 auto;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      }
+      button {
+        background: #0077cc;
+        color: white;
+        border: none;
+        padding: 10px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #005fa3;
+      }
+      pre {
+        background: #f0f4ff;
+        padding: 12px;
+        border-radius: 6px;
+        overflow-x: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Teste EdgeHealth</h1>
+      <p>Use este HTML para verificar se o frontend carrega corretamente e se a API responde.</p>
+
+      <button id="btn-health">Verificar API</button>
+
+      <div id="resultado" style="margin-top: 20px;"></div>
+    </div>
+
+    <script>
+      document.getElementById("btn-health").addEventListener("click", async () => {
+        const resultado = document.getElementById("resultado");
+        resultado.innerHTML = "<p>Carregando...</p>";
+
+        try {
+          const resposta = await fetch("http://localhost:5000/api/health");
+          const dados = await resposta.json();
+
+          resultado.innerHTML = `
+            <h2>Resposta da API</h2>
+            <pre>${JSON.stringify(dados, null, 2)}</pre>
+          `;
+        } catch (erro) {
+          resultado.innerHTML = `
+            <h2>Erro</h2>
+            <pre>${erro.message}</pre>
+          `;
+        }
+      });
+    </script>
+  </body>
+</html>
