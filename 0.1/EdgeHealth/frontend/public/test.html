@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EdgeHealth - Teste de API</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 24px; background: #f4f7fb; color: #222; }
+      h1 { color: #0057a3; }
+      .card { background: #fff; border: 1px solid #d6dde8; border-radius: 10px; padding: 20px; max-width: 720px; box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+      button { background: #0057a3; color: white; border: none; padding: 12px 18px; border-radius: 8px; cursor: pointer; }
+      button:hover { background: #004680; }
+      .output { margin-top: 16px; white-space: pre-wrap; background: #f0f4ff; padding: 14px; border-radius: 8px; border: 1px solid #c8d2e8; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Teste EdgeHealth</h1>
+      <p>Use este HTML para verificar se a API está acessível e retorna o status correto.</p>
+      <button id="btn-health">Verificar API</button>
+      <div id="resultado" class="output"></div>
+    </div>
+    <script>
+      document.getElementById('btn-health').addEventListener('click', async () => {
+        const resultado = document.getElementById('resultado');
+        resultado.textContent = 'Carregando...';
+
+        try {
+          const res = await fetch('http://localhost:5000/api/health');
+          const data = await res.json();
+          resultado.textContent = JSON.stringify(data, null, 2);
+        } catch (err) {
+          resultado.textContent = 'Erro: ' + err.message;
+        }
+      });
+    </script>
+  </body>
+</html>
