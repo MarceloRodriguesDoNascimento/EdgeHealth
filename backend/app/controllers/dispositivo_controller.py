@@ -1,11 +1,6 @@
 from flask import Blueprint, jsonify, request
 
-from app.services.dispositivo_service import (
-    atualizar_dispositivo,
-    criar_dispositivo,
-    excluir_dispositivo,
-    listar_dispositivos,
-)
+from app.services.dispositivo_service import DispositivoService
 from app.services.ping_service import registrar_ping
 
 
@@ -14,19 +9,32 @@ dispositivo_bp = Blueprint("dispositivo", __name__, url_prefix="/dispositivos")
 
 @dispositivo_bp.get("")
 def index():
-    dispositivos = listar_dispositivos()
+    dispositivos = DispositivoService.listar_todos()
     return jsonify([dispositivo.to_dict() for dispositivo in dispositivos])
+
+
+@dispositivo_bp.get("/<int:dispositivo_id>")
+def show(dispositivo_id):
+    dispositivo = DispositivoService.buscar_por_id(dispositivo_id)
+    if not dispositivo:
+        return jsonify({"erro": "dispositivo nao encontrado"}), 404
+    return jsonify(dispositivo.to_dict())
 
 
 @dispositivo_bp.post("")
 def create():
-    dispositivo = criar_dispositivo(request.get_json() or {})
+    dados = request.get_json() or {}
+    if not dados.get("nome") or not dados.get("ip"):
+        return jsonify({"erro": "Os campos nome e ip são obrigatórios."}), 400
+
+    dispositivo = DispositivoService.criar(dados)
     return jsonify(dispositivo.to_dict()), 201
 
 
 @dispositivo_bp.put("/<int:dispositivo_id>")
 def update(dispositivo_id):
-    dispositivo = atualizar_dispositivo(dispositivo_id, request.get_json() or {})
+    dados = request.get_json() or {}
+    dispositivo = DispositivoService.atualizar(dispositivo_id, dados)
     if not dispositivo:
         return jsonify({"erro": "dispositivo nao encontrado"}), 404
     return jsonify(dispositivo.to_dict())
@@ -34,7 +42,8 @@ def update(dispositivo_id):
 
 @dispositivo_bp.delete("/<int:dispositivo_id>")
 def destroy(dispositivo_id):
-    if not excluir_dispositivo(dispositivo_id):
+    sucesso = DispositivoService.deletar(dispositivo_id)
+    if not sucesso:
         return jsonify({"erro": "dispositivo nao encontrado"}), 404
     return "", 204
 
