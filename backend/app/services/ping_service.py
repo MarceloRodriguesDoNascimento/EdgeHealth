@@ -16,6 +16,9 @@ def registrar_ping(dispositivo_id, status="online"):
                 descricao="Falha registrada pelo ping",
             )
         )
+    elif status in {"online", "instavel"}:
+        dispositivo.latencia = 12.5 if status == "online" else 200.0
+        dispositivo.perda_pacotes = 0.0 if status == "online" else 15.0
 
     db.session.commit()
     return dispositivo
