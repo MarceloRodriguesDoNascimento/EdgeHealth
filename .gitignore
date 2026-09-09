@@ -6,3 +6,10 @@ venv/
 node_modules/
 dist/
 *.db
+*.db-*
+.pytest_cache/
+.coverage
+htmlcov/
+test-results/
+playwright-report/
+*.log
