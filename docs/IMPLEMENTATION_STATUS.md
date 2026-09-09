@@ -2,6 +2,8 @@
 
 Branch: `feat/edgehealth-mvp`. Base: `fc60d981e783270e3d6caeed72f88bd1d9e91029`. Revisão: 09/09/2026.
 
+Código e testes registrados no commit `f2a7dfe`. A revisão automática bloqueou `git push` por exigir autorização explícita para publicar código/histórico no GitHub. O envio remoto não foi realizado; a branch permanece local, preservada para revisão e autorização.
+
 Implementação retomada e preservada. Escopo de código TASK-001–TASK-032 coberto; detalhes e limites de aceite em [POST_IMPLEMENTATION_REVIEW.md](POST_IMPLEMENTATION_REVIEW.md).
 
 - Backend: 30 testes aprovados, 1 teste ICMP opcional pulado na suíte padrão; cobertura de linhas de 93%.
