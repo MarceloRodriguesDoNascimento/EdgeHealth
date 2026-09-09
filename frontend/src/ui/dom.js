@@ -1,0 +1,71 @@
+export function el(tag, props = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(props || {})) {
+    if (value === undefined || value === null || value === false) continue;
+    if (key.startsWith('on')) node.addEventListener(key.slice(2).toLowerCase(), value);
+    else if (key === 'className') node.className = value;
+    else if (key === 'dataset') Object.assign(node.dataset, value);
+    else if (key in node && !key.startsWith('aria')) node[key] = value;
+    else node.setAttribute(key, String(value));
+  }
+  for (const child of children.flat(Infinity)) {
+    if (child !== null && child !== undefined && child !== false) node.append(child instanceof Node ? child : document.createTextNode(String(child)));
+  }
+  return node;
+}
+export const empty = (text = 'Nenhum registro encontrado.') => el('div', { className: 'empty' }, text);
+export const label = (text, input) => el('label', { className: 'field' }, el('span', {}, text), input);
+export const input = (name, placeholder = '', props = {}) => el('input', { name, placeholder, ...props });
+export const button = (text, action, kind = 'secondary', props = {}) => el('button', { type: 'button', className: `button ${kind}`, onclick: action, ...props }, text);
+export const badge = (text, kind) => el('span', { className: `badge ${kind || text || 'SEM_COLETA'}` }, text || 'Aguardando coleta');
+export function date(value) { return value ? new Date(value).toLocaleString('pt-BR') : '—'; }
+export function duration(seconds) { const m = Math.floor(seconds / 60); return m >= 60 ? `${Math.floor(m/60)}h ${m%60}min` : `${m}min ${Math.floor(seconds%60)}s`; }
+export function number(value, suffix = '') { return value === null || value === undefined ? '—' : `${Number(value).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}${suffix}`; }
+export function select(name, items, value = '') {
+  const node = el('select', { name }, items.map(([key, text]) => el('option', { value: String(key) }, text)));
+  node.value = String(value); return node;
+}
+export function table(headings, rows) {
+  return el('div', { className: 'table-wrap' }, el('table', {},
+    el('thead', {}, el('tr', {}, headings.map(h => el('th', { scope: 'col' }, h)))),
+    el('tbody', {}, rows.length ? rows.map(row => el('tr', {}, row.map(cell => el('td', {}, cell)))) : el('tr', {}, el('td', { colSpan: headings.length }, empty())))));
+}
+export function toast(message, error = false) {
+  const area = document.querySelector('#notifications');
+  const node = el('div', { className: `toast ${error ? 'error' : ''}` }, message);
+  area.append(node); setTimeout(() => node.remove(), 6000);
+}
+export function form(fields, submitText, onSubmit) {
+  const error = el('div', { className: 'form-error', role: 'alert' });
+  const submit = el('button', { type: 'submit', className: 'button primary' }, submitText);
+  const node = el('form', { className: 'form-grid' }, fields, error, el('div', { className: 'form-actions' }, submit));
+  node.addEventListener('submit', async event => {
+    event.preventDefault(); error.textContent = ''; submit.disabled = true;
+    const original = submit.textContent; submit.textContent = 'Salvando…';
+    try { await onSubmit(Object.fromEntries(new FormData(node)), node); }
+    catch (e) { error.textContent = e.message; }
+    finally { submit.disabled = false; submit.textContent = original; }
+  }); return node;
+}
+export function modal(title, content) {
+  const previous = document.activeElement;
+  const dialog = el('dialog', { className: 'modal' });
+  const close = () => dialog.close();
+  dialog.append(el('div', { className: 'modal-heading' }, el('h2', {}, title), button('Fechar', close, 'ghost')));
+  dialog.append(typeof content === 'function' ? content(close) : content);
+  dialog.addEventListener('close', () => { dialog.remove(); previous?.focus(); }, { once: true });
+  document.body.append(dialog); dialog.showModal(); return dialog;
+}
+export function confirmAction(title, message, action) {
+  modal(title, close => el('div', {}, el('p', {}, message), el('div', { className: 'actions end' },
+    button('Cancelar', close), button('Confirmar', async event => {
+      const target = event.currentTarget;
+      target.disabled = true;
+      try { await action(); close(); }
+      catch (e) { toast(e.message, true); target.disabled = false; }
+    }, 'danger'))));
+}
+export function pageHeader(title, description, actions) {
+  return el('header', { className: 'page-heading' }, el('div', {}, el('h1', {}, title), description ? el('p', { className: 'muted' }, description) : null), actions);
+}
+export function params(data) { return new URLSearchParams(Object.entries(data).filter(([,v]) => v !== '' && v !== null && v !== undefined)).toString(); }
