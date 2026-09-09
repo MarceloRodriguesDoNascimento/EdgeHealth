@@ -176,6 +176,7 @@ Cobertura de linhas não mede a completude funcional nem prova comportamento de 
 
 1. **RF08–RF10 / aceite de rede:** executar o teste real e o roteiro na máquina/LAN da equipe. Exige permissão ICMP do SO e conectividade aos alvos. O teste real deste ambiente falhou na criação do socket, antes de enviar pacotes; não há alteração de regra de negócio que transforme esse resultado em medição confiável.
 2. **Homologação de navegação final:** validar os navegadores usados pela equipe. Os fluxos autenticados foram testados em DOM/HTTP; o ambiente de visualização não compartilha a rede do processo Flask externo, limitando a inspeção visual autenticada. O proxy Vite foi validado separadamente no teste HTTP real.
+3. **Publicação no GitHub:** o código está no commit local `f2a7dfe`, branch `feat/edgehealth-mvp`. A revisão automática rejeitou `git push --set-upstream origin feat/edgehealth-mvp` porque a autorização de implementação não explicitou publicação de código/histórico nesse destino externo. Não houve envio; é necessária autorização explícita para publicar essa branch no repositório informado. Esse bloqueio não altera os resultados dos testes ou o código local.
 
 CSV atende ao formato autorizado. Impacto manual identificado, ausência de descoberta de topologia, um ponto coletor e ausência de retenção automática são decisões de escopo documentadas; não foram substituídas por estimativas inventadas. A duração é da ocorrência observada, não uma medida contínua exata de downtime.
 
