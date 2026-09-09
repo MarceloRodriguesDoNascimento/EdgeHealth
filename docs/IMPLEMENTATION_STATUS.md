@@ -2,7 +2,7 @@
 
 Branch: `feat/edgehealth-mvp`. Base: `fc60d981e783270e3d6caeed72f88bd1d9e91029`. Revisão: 09/09/2026.
 
-Código e testes registrados no commit `f2a7dfe`. O usuário autorizou explicitamente publicar a branch no repositório GitHub informado. A tentativa após essa autorização falhou por falta de credenciais GitHub no ambiente (`could not read Username`). O plugin GitHub foi localizado, mas sua instalação/conexão ainda não foi confirmada. A autorização de publicação permanece válida; falta autenticação com acesso ao repositório. O envio remoto não foi realizado.
+Código e testes registrados no commit `f2a7dfe`. O usuário autorizou explicitamente publicar a branch no repositório GitHub informado. O plugin GitHub foi conectado e confirmou acesso ao repositório e permissão de escrita da conta. A tentativa de publicação pela integração, porém, retornou `403: Resource not accessible by integration` ao criar a árvore Git. O terminal também permanece sem credenciais (`could not read Username`). A autorização de publicação permanece válida; o próximo passo é autenticar o GitHub CLI pelo fluxo oficial no navegador. Nenhuma branch ou commit remoto foi criado. Os commits locais e o código validado estão preservados.
 
 Implementação retomada e preservada. Escopo de código TASK-001–TASK-032 coberto; detalhes e limites de aceite em [POST_IMPLEMENTATION_REVIEW.md](POST_IMPLEMENTATION_REVIEW.md).
 
