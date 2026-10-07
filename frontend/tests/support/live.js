@@ -69,6 +69,9 @@ export async function seed(browser, {base, probe}) {
   await api(admin, 'POST', '/api/auth/registro', {nome_fantasia: 'Rede Corporativa de Demonstração Responsiva Ltda', cnpj: '11222333000181',
     nome: 'Administradora Responsável pela Infraestrutura', email: 'admin@responsivo.example', senha: 'senha-responsiva-123', aceite_termos: true});
   await api(admin, 'POST', '/api/coletores', {nome: 'Coletor da matriz — andar térreo, sala de TI'});
+  // Costs configured: the first-access cost assistant is checked on its own (responsive.test.js).
+  await api(admin, 'PUT', '/api/empresa/custos', {salario_medio: '3000', total_funcionarios: 40,
+    expediente: {dias: [1, 2, 3, 4, 5, 6, 7], inicio: '00:00', fim: '23:59'}});
   const devices = [];
   for (const [nome, ip, tipo, localizacao] of [
     ['Switch principal do segundo andar (rack B)', '10.20.30.40', 'Switch gerenciável', 'Andar 2 · rack B · corredor norte'],
@@ -99,7 +102,7 @@ export function auditPage() {
   const outside = all.filter(e => e.getBoundingClientRect().right > vw + 1 && !inScroller(e)).map(name);
   const scrollers = all.filter(e => e.scrollWidth > e.clientWidth + 1 && ['auto', 'scroll'].includes(getComputedStyle(e).overflowX) && !e.matches('pre,textarea,.evidence-json')).map(name);
   const targets = all.filter(e => e.matches('button,a[href],input:not([type=hidden]),select,textarea,summary'));
-  const small = targets.filter(e => { const r = e.getBoundingClientRect(); const box = e.matches('input[type=checkbox]') ? e.closest('label') || e : e; const b = box.getBoundingClientRect();
+  const small = targets.filter(e => { const r = e.getBoundingClientRect(); const box = e.matches('input[type=checkbox],input[type=radio]') ? e.closest('label') || e : e; const b = box.getBoundingClientRect();
     const inline = e.matches('a') && getComputedStyle(e).display === 'inline' && e.closest('p,li,dd,span,small');  // links inside running text
     return !inline && (Math.min(r.height, b.height) < 44 - 0.5 && b.height < 44 - 0.5 || b.width < 44 - 0.5); }).map(name);
   const smallFont = all.filter(e => e.matches('input:not([type=checkbox]):not([type=radio]),select,textarea') && parseFloat(getComputedStyle(e).fontSize) < 16).map(name);

@@ -5,7 +5,10 @@ from ..models import Coletor, Dispositivo,Diagnostico, DiagnosticoRecomendacao, 
 
 
 def company_dict(e):
-    return {k: getattr(e,k) for k in ('id','nome_fantasia','cnpj','email','telefone')}
+    from .costs import company_costs
+    result = {k: getattr(e,k) for k in ('id','nome_fantasia','cnpj','email','telefone')}
+    result['custos'] = company_costs(e)
+    return result
 
 
 def user_dict(u):
@@ -15,7 +18,10 @@ def user_dict(u):
 
 
 def device_dict(d):
-    result = {k: getattr(d,k) for k in ('id','empresa_id','nome','ip','tipo','localizacao','status','latencia_ms','perda_pacotes_pct','erro_coleta','coletor_id')}
+    from .costs import money
+    result = {k: getattr(d,k) for k in ('id','empresa_id','nome','ip','tipo','localizacao','status','latencia_ms','perda_pacotes_pct','erro_coleta','coletor_id',
+                                         'usuarios_dependentes','perda_produtividade_pct')}
+    result['receita_hora_dependente'] = money(d.receita_hora_dependente)
     result.update(ultima_coleta=iso(d.ultima_coleta), arquivado_em=iso(d.arquivado_em),
                   desatualizado=not d.ultima_coleta or (utcnow()-d.ultima_coleta).total_seconds() > current_app.config['STALE_AFTER_SECONDS'])
     if d.coletor_id:
@@ -55,7 +61,10 @@ def failure_dict(f, detail=False):
                   ultima_observacao=iso(f.ultima_observacao), descricao=f.descricao, severidade=f.severidade,
                   justificativa=f.justificativa, duracao_segundos=round(duration,1), encerramento=f.encerramento,
                   impacto=dict(usuarios_afetados=impact.usuarios_afetados, origem=impact.origem,
-                               observacao=impact.observacao, atualizado_em=iso(impact.atualizado_em)) if impact else None)
+                               observacao=impact.observacao, atualizado_em=iso(impact.atualizado_em),
+                               custos_diretos=None if impact.custos_diretos is None else str(impact.custos_diretos)) if impact else None)
     if detail:
+        from .costs import full_estimate
         result['diagnostico'] = diagnostic_dict(db.session.scalar(select(Diagnostico).where(Diagnostico.falha_id==f.id)))
+        result['prejuizo'] = full_estimate(f)
     return result

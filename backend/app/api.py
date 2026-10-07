@@ -79,6 +79,18 @@ def company():
 def update_company():
     return jsonify(company_dict(management.update_company(v.payload(['nome_fantasia','cnpj','email','telefone']))))
 
+@api.put('/empresa/custos')
+@require_auth(admin=True)
+def update_company_costs():
+    return jsonify(company_dict(management.update_company_costs(v.payload(
+        ['salario_medio','fator_encargos','horas_mes','total_funcionarios','expediente','fuso']))))
+
+@api.post('/empresa/custos/pular')
+@require_auth(admin=True)
+def skip_cost_assistant():
+    v.payload([])
+    return jsonify(company_dict(management.skip_cost_assistant()))
+
 @api.get('/usuarios')
 @require_auth(admin=True)
 def users():
@@ -111,12 +123,19 @@ def device(id):
 @api.post('/dispositivos')
 @require_auth()
 def create_device():
-    return jsonify(device_dict(management.save_device(v.payload(['nome','ip','tipo','localizacao','coletor_id'],['nome','ip','tipo','localizacao'])))),201
+    return jsonify(device_dict(management.save_device(v.payload(['nome','ip','tipo','localizacao','coletor_id','usuarios_dependentes','perda_produtividade_pct','receita_hora_dependente'],['nome','ip','tipo','localizacao'])))),201
 
 @api.put('/dispositivos/<int:id>')
 @require_auth()
 def update_device(id):
-    return jsonify(device_dict(management.save_device(v.payload(['nome','ip','tipo','localizacao','coletor_id']),id)))
+    return jsonify(device_dict(management.save_device(v.payload(['nome','ip','tipo','localizacao','coletor_id','usuarios_dependentes','perda_produtividade_pct','receita_hora_dependente']),id)))
+
+
+@api.get('/dispositivos/impacto-padrao')
+@require_auth()
+def device_impact_default():
+    from .services.costs import defaults
+    return jsonify(defaults(request.args.get('tipo',''),db.session.get(Empresa,g.user.empresa_id)))
 
 @api.delete('/dispositivos/<int:id>')
 @require_auth()
@@ -173,15 +192,19 @@ def failure(id):
 @require_auth()
 def update_impact(id):
     failure=management.scoped_failure(id)
-    data=v.payload(['usuarios_afetados','observacao'],['usuarios_afetados'])
-    count=v.integer(data['usuarios_afetados'],'Usuários afetados')
+    # usuarios_afetados empty/null: the device's people are used in the estimate.
+    data=v.payload(['usuarios_afetados','observacao','custos_diretos'])
     impact=db.session.scalar(select(Impacto).where(Impacto.falha_id==failure.id))
     if not impact:
         impact=Impacto(falha_id=failure.id)
         db.session.add(impact)
-    impact.usuarios_afetados=count
-    impact.origem='INFORMADO_PELO_USUARIO'
-    impact.observacao=v.string(data.get('observacao',''),'Observação',500,0)
+    if 'usuarios_afetados' in data:
+        impact.usuarios_afetados=v.optional(data['usuarios_afetados'],v.integer,'Usuários afetados')
+        impact.origem='INFORMADO_PELO_USUARIO' if impact.usuarios_afetados is not None else 'NAO_INFORMADO'
+    if 'custos_diretos' in data:
+        impact.custos_diretos=v.optional(data['custos_diretos'],v.decimal_value,'Custos diretos')
+    if 'observacao' in data:
+        impact.observacao=v.string(data.get('observacao') or '','Observação',500,0)
     impact.atualizado_em=utcnow()
     db.session.flush()
     refresh_company(g.user.empresa_id,extra_failure=failure)

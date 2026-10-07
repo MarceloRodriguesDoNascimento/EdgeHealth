@@ -5,7 +5,7 @@ import { Login, TermsPending } from './pages/Login.js';
 import { Coletores } from './pages/Coletores.js';
 import { Dashboard } from './pages/Dashboard.js';
 import { Dispositivos } from './pages/Dispositivos.js';
-import { Empresa } from './pages/Empresa.js';
+import { Empresa, costAssistant } from './pages/Empresa.js';
 import { Usuarios } from './pages/Usuarios.js';
 import { Historico } from './pages/Historico.js';
 import { Falha } from './pages/Falha.js';
@@ -20,11 +20,14 @@ function enter(data){
   session=data;
   if(session.usuario.termos_pendentes){app.replaceChildren(TermsPending(session,enter,logout));return;}
   shell();navigate();
+  // Optional cost assistant, offered once to the administrator (skipping is remembered).
+  const c=session.empresa.custos;
+  if(session.usuario.papel==='ADMIN'&&c&&!c.configurado&&!c.assistente)costAssistant(session);
 }
 function signedIn(data){window.location.hash='dashboard';enter(data);}
 function signedOut(){session=null;cleanup();generation++;app.replaceChildren(Login(signedIn));}
 function shell(){
-  const links=[['dashboard','Visão da rede','◫'],['dispositivos','Dispositivos','▤'],['historico','Histórico de falhas','◷'],['relatorios','Relatórios','↓'],...(session.usuario.papel==='ADMIN'?[['coletores','Coletores','⇅'],['empresa','Empresa','▦'],['usuarios','Equipe','◎']]:[])];
+  const links=[['dashboard','Visão da rede','◫'],['dispositivos','Dispositivos','▤'],['historico','Histórico de falhas','◷'],['relatorios','Relatórios','↓'],['empresa','Empresa','▦'],...(session.usuario.papel==='ADMIN'?[['coletores','Coletores','⇅'],['usuarios','Equipe','◎']]:[])];
   // Below 850 px the navigation collapses behind a menu button (styles.css); on wider screens the button is hidden.
   const menuButton=button([el('span',{'aria-hidden':'true'},'☰'),'Menu'],()=>setMenu(menuButton.getAttribute('aria-expanded')!=='true'),'menu-button',{'aria-expanded':'false','aria-controls':'main-nav'});
   app.replaceChildren(el('div',{className:'app-layout'},

@@ -1,6 +1,21 @@
 from datetime import datetime, timezone
+from decimal import Decimal
 from sqlalchemy import CheckConstraint, Index, text
+from sqlalchemy.types import String, TypeDecorator
 from .extensions import db
+
+
+class DecimalText(TypeDecorator):
+    """Exact decimal stored as canonical text ("3000.00"): SQLite has no native decimal and
+    Numeric would round-trip through float. Money is never a float in this application."""
+    impl = String(24)
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        return None if value is None else str(Decimal(value))
+
+    def process_result_value(self, value, dialect):
+        return None if value is None else Decimal(value)
 
 def utcnow():
     # SQLite stores naive UTC; all external dates explicitly include Z.
@@ -17,6 +32,16 @@ class Empresa(db.Model):
     email = db.Column(db.String(254))
     telefone = db.Column(db.String(30))
     criada_em = db.Column(db.DateTime, nullable=False, default=utcnow)
+    # Costs for the financial loss estimate (services/costs.py). NULL salary: not configured.
+    salario_medio = db.Column(DecimalText())
+    fator_encargos = db.Column(DecimalText(), nullable=False, default=Decimal('1.7'), server_default='1.7')
+    horas_mes = db.Column(db.Integer, nullable=False, default=220, server_default='220')
+    total_funcionarios = db.Column(db.Integer)
+    expediente_dias = db.Column(db.String(7), nullable=False, default='12345', server_default='12345')  # ISO weekdays
+    expediente_inicio = db.Column(db.String(5), nullable=False, default='08:00', server_default='08:00')
+    expediente_fim = db.Column(db.String(5), nullable=False, default='18:00', server_default='18:00')
+    fuso = db.Column(db.String(50), nullable=False, default='America/Sao_Paulo', server_default='America/Sao_Paulo')
+    assistente_custos = db.Column(db.String(10))  # NULL: not offered yet; PULADO or CONCLUIDO
 
 class Usuario(db.Model):
     __tablename__ = 'usuarios'
@@ -88,6 +113,10 @@ class Dispositivo(db.Model):
     lease_owner = db.Column(db.String(64))
     lease_until = db.Column(db.DateTime)
     proxima_coleta = db.Column(db.DateTime, nullable=False, default=utcnow, index=True)
+    # Business impact (services/costs.py). NULL: fall back to the default for the device type.
+    usuarios_dependentes = db.Column(db.Integer)
+    perda_produtividade_pct = db.Column(db.Integer)
+    receita_hora_dependente = db.Column(DecimalText())
     __table_args__ = (
         CheckConstraint("status IS NULL OR status IN ('ONLINE','INSTAVEL','OFFLINE')", name='status'),
         CheckConstraint('falhas_consecutivas >= 0 AND sucessos_consecutivos >= 0', name='counters'),
@@ -155,6 +184,7 @@ class Impacto(db.Model):
     origem = db.Column(db.String(30), nullable=False, default='NAO_INFORMADO')
     observacao = db.Column(db.String(500))
     atualizado_em = db.Column(db.DateTime, nullable=False, default=utcnow)
+    custos_diretos = db.Column(DecimalText())  # technician, parts, penalties (R$)
     __table_args__ = (CheckConstraint('usuarios_afetados IS NULL OR usuarios_afetados >= 0', name='usuarios'),)
 
 class Diagnostico(db.Model):

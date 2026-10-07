@@ -20,6 +20,14 @@ export const button = (text, action, kind = 'secondary', props = {}) => el('butt
 export const badge = (text, kind) => el('span', { className: `badge ${kind || text || 'SEM_COLETA'}` }, text || 'Aguardando coleta');
 export function date(value) { return value ? new Date(value).toLocaleString('pt-BR') : '—'; }
 export function duration(seconds) { const m = Math.floor(seconds / 60); return m >= 60 ? `${Math.floor(m/60)}h ${m%60}min` : `${m}min ${Math.floor(seconds%60)}s`; }
+// Money arrives from the API as exact decimal text ("1234.56"); display only, never recomputed here.
+export function brl(value) { return value === null || value === undefined || value === '' ? '—' : Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
+// "3.000,50", "3000,50" or "3000.50" -> "3000.50" (sent as text; the API keeps it as Decimal). Empty -> null.
+export function moneyInput(text) {
+  const raw = String(text ?? '').trim().replace(/^R\$\s*/i, '');
+  if (!raw) return null;
+  return raw.includes(',') ? raw.replace(/\./g, '').replace(',', '.') : raw;
+}
 export function number(value, suffix = '') { return value === null || value === undefined ? '—' : `${Number(value).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}${suffix}`; }
 export function select(name, items, value = '') {
   const node = el('select', { name }, items.map(([key, text]) => el('option', { value: String(key) }, text)));

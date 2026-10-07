@@ -62,8 +62,34 @@ test('telas principais em 360 px sem rolagem horizontal; menu acessível; deskto
     assert.ok(cards.minTarget >= 44, `alvo de toque com ${cards.minTarget}px`);
     await phone.getByRole('button', {name: 'Cadastrar dispositivo'}).click();
     await phone.waitForSelector('dialog[open] form');
-    const fonts = await phone.evaluate(() => [...document.querySelectorAll('dialog input, dialog select')].map(e => parseFloat(getComputedStyle(e).fontSize)));
+    const fonts = await phone.evaluate(() => [...document.querySelectorAll('dialog input:not([type=checkbox]):not([type=radio]), dialog select')].map(e => parseFloat(getComputedStyle(e).fontSize)));
     assert.ok(fonts.length && fonts.every(f => f >= 16), `inputs com fonte < 16px: ${fonts}`);
+
+    // Financial loss estimate on a phone: the open calculation and the R$ value, no overflow.
+    await phone.goto(`/#falha/${data.failureId}`); await settle(phone);
+    const loss = await phone.evaluate(() => ({text: document.querySelector('.loss-panel')?.textContent || '',
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth}));
+    assert.match(loss.text, /R\$\s?[\d.]+,\d{2}/);
+    assert.match(loss.text, /pessoa.* × R\$ 23,18\/h × \d+% × [\d,]+ h de expediente/);
+    assert.equal(loss.overflow, 0);
+
+    // First access of a new company's administrator: the optional cost assistant fits 360 px and,
+    // once skipped, is not shown again.
+    const fresh = await browser.newContext({baseURL: stack.base, viewport: {width: 360, height: 800}, isMobile: true, hasTouch: true});
+    const r = await fresh.request.post('/api/auth/registro', {data: {nome_fantasia: 'Empresa Nova', cnpj: '11444777000161', nome: 'Admin Novo',
+      email: 'novo@responsivo.example', senha: 'senha-nova-12345', aceite_termos: true}});
+    assert.ok(r.ok(), await r.text());
+    const first = await fresh.newPage();
+    await first.goto('/#dashboard'); await settle(first);
+    const wizard = first.getByRole('dialog', {name: 'Quer estimar o custo das falhas?'});
+    await wizard.waitFor();
+    assert.ok(await first.evaluate(() => { const d = document.querySelector('dialog[open]').getBoundingClientRect();
+      return d.left >= 0 && d.right <= document.documentElement.clientWidth && document.documentElement.scrollWidth <= document.documentElement.clientWidth; }));
+    await wizard.getByRole('button', {name: 'Pular, faço depois'}).click();
+    await first.waitForFunction(() => !document.querySelector('dialog[open]'));
+    await first.reload(); await settle(first); await first.waitForTimeout(500);
+    assert.equal(await first.locator('dialog[open]').count(), 0, 'o assistente não deve voltar depois de pular');
+    await fresh.close();
 
     // Desktop keeps the sidebar navigation and the classic table.
     const desk = await (await browser.newContext({baseURL: stack.base, storageState: await phone.context().storageState(), viewport: {width: 1280, height: 800}})).newPage();

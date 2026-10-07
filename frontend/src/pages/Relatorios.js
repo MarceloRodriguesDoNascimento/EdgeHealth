@@ -3,7 +3,7 @@ import { apiFetch } from '../services/api.js';
 export async function Relatorios(){
   const devices=await apiFetch('/dispositivos?arquivados=1');
   return el('section',{},pageHeader('Relatórios','Exporte o inventário, as medições e a análise das ocorrências.'),el('div',{className:'panel narrow'},
-    el('h2',{},'Exportar dados da empresa'),el('p',{className:'muted'},'O download contém quatro arquivos CSV em um ZIP: dispositivos, métricas, falhas e diagnósticos. Inclui recomendações e impacto das ocorrências.'),
+    el('h2',{},'Exportar dados da empresa'),el('p',{className:'muted'},'O download contém quatro arquivos CSV em um ZIP: dispositivos, métricas, falhas e diagnósticos. Inclui recomendações, impacto e o prejuízo estimado de cada ocorrência (coluna prejuizo_estimado); o total do período, sem contar duas vezes as falhas compartilhadas, fica no leia-me.json.'),
     form([label('Dispositivo',select('dispositivo_id',[['','Todos os dispositivos'],...devices.map(d=>[d.id,d.nome])])),
       label('Início (UTC)',input('inicio','',{type:'date'})),label('Fim (UTC)',input('fim','',{type:'date'})),
       el('p',{className:'muted full'},'Sem período informado, são consultados os últimos 30 dias. O inventário inclui arquivados. Ocorrências que se sobrepõem ao intervalo também são incluídas.')
