@@ -54,14 +54,20 @@ def export_report():
     failures=bounded(fq.order_by(Falha.inicio,Falha.id))
     diagnoses=bounded(select(Diagnostico).where(Diagnostico.falha_id.in_([f.id for f in failures])).order_by(Diagnostico.id))
     company=db.session.get(Empresa,g.user.empresa_id)
+    from .costs import total_for, DISCLAIMER, NOT_CONFIGURED
+    costs=total_for(failures,company)
+    estimates=costs.get('individual',{})
+    failure_rows=[dict(failure_dict(f),prejuizo_estimado=estimates.get(f.id)) for f in failures]
     metadata=dict(empresa=company.nome_fantasia,cnpj=company.cnpj,inicio=iso(start),fim_exclusivo=iso(end),
                   gerado_em=iso(utcnow()),contagens=dict(dispositivos=len(devices),metricas=len(metrics),falhas=len(failures),diagnosticos=len(diagnoses)),
+                  prejuizo_estimado=dict(total=costs.get('total'),aviso=DISCLAIMER if costs['configurado'] else NOT_CONFIGURED,
+                      observacao='Total sem contar duas vezes as pessoas de falhas compartilhadas; a coluna prejuizo_estimado do falhas.csv é a estimativa individual de cada ocorrência (R$, ponto decimal). Falhas abertas: valor parcial até a geração do relatório.'),
                   observacao='Dispositivos: inventário atual, incluindo arquivados. Falhas: ocorrências sobrepostas ao período. Diagnósticos: última análise disponível das falhas selecionadas. Datas em UTC. Métricas: coletor_id vazio indica worker local; fora_de_ordem=True indica amostra atrasada, mantida no histórico sem alterar estado ou ocorrências.')
     output=io.BytesIO()
     with zipfile.ZipFile(output,'w',zipfile.ZIP_DEFLATED) as z:
         z.writestr('dispositivos.csv',csv_bytes([device_dict(d) for d in devices],['id','nome','ip','tipo','localizacao','status','ultima_coleta','arquivado_em','coletor']))
         z.writestr('metricas.csv',csv_bytes([metric_dict(m) for m in metrics],['id','dispositivo_id','coletada_em','respondeu','latencia_ms','pacotes_enviados','pacotes_recebidos','perda_pacotes_pct','status','coletor_id','recebida_em','fora_de_ordem']))
-        z.writestr('falhas.csv',csv_bytes([failure_dict(f) for f in failures],['id','dispositivo_id','dispositivo','tipo','estado','inicio','fim','duracao_segundos','severidade','justificativa','impacto','encerramento']))
+        z.writestr('falhas.csv',csv_bytes(failure_rows,['id','dispositivo_id','dispositivo','tipo','estado','inicio','fim','duracao_segundos','severidade','justificativa','impacto','encerramento','prejuizo_estimado']))
         z.writestr('diagnosticos.csv',csv_bytes([diagnostic_dict(d) for d in diagnoses],['id','falha_id','estado','descricao','causas','evidencias','recomendacoes','analisado_em','versao_regras']))
         z.writestr('leia-me.json',json.dumps(metadata,ensure_ascii=False,indent=2))
     output.seek(0)

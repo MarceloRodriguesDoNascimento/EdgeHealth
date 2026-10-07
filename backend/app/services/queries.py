@@ -80,4 +80,17 @@ def dashboard():
                 for c in db.session.scalars(select(Coletor).where(Coletor.empresa_id==g.user.empresa_id,Coletor.revogado_em.is_(None)).order_by(Coletor.nome))]
     return dict(coletores=collectors,indicadores=counts,severidades=dict(Counter(f.severidade for f in failures)),
                 falhas_recentes=[failure_dict(f) for f in recent],serie=series,serie_total=sample_total,
-                dispositivo_id=device_id,dispositivos=[device_dict(d) for d in devices],atualizado_em=iso(now))
+                dispositivo_id=device_id,dispositivos=[device_dict(d) for d in devices],atualizado_em=iso(now),
+                custos=cost_summary(now))
+
+
+def cost_summary(now, days=30):
+    """Estimated loss of the incidents started in the last `days` days (shared outages de-duplicated)."""
+    from ..models import Empresa
+    from .costs import total_for
+    since=now-timedelta(days=days)
+    failures=db.session.scalars(select(Falha).join(Dispositivo).where(Dispositivo.empresa_id==g.user.empresa_id,
+        Falha.inicio>=since).order_by(Falha.inicio)).all()
+    result=total_for(failures,db.session.get(Empresa,g.user.empresa_id),now)
+    result.pop('individual',None)
+    return dict(result,dias=days)
