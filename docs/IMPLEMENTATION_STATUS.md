@@ -1,17 +1,45 @@
-# Estado da implementação
+# Estado da implementação (checkpoint)
 
-Branch: `feat/edgehealth-mvp`. Base: `fc60d981e783270e3d6caeed72f88bd1d9e91029`. Revisão: 09/09/2026.
+Atualizado em **06/10/2026** (America/Sao_Paulo).
 
-Código e testes registrados no commit `f2a7dfe`. O usuário autorizou explicitamente publicar a branch no repositório GitHub informado. O plugin GitHub foi conectado e confirmou acesso ao repositório e permissão de escrita da conta. A tentativa de publicação pela integração, porém, retornou `403: Resource not accessible by integration` ao criar a árvore Git. O usuário também concluiu o fluxo do GitHub CLI no navegador, mas o ambiente bloqueou `https://api.github.com:443` antes de salvar a sessão. A política do ambiente recusou a solicitação de ampliação das permissões de execução/rede. `gh auth status` confirmou ausência de sessão salva. Não repetir o login neste ambiente sem resolver esse bloqueio; a alternativa é publicar os mesmos commits a partir do computador da equipe usando o bundle de entrega. A autorização de publicação permanece válida. Nenhuma branch ou commit remoto foi criado. Os commits locais e o código validado estão preservados.
+## Referência
 
-Implementação retomada e preservada. Escopo de código TASK-001–TASK-032 coberto; detalhes e limites de aceite em [POST_IMPLEMENTATION_REVIEW.md](POST_IMPLEMENTATION_REVIEW.md).
+- Branch: `feat/edgehealth-mvp`, **publicada** em `origin` (`MarceloRodriguesDoNascimento/EdgeHealth`). A PR #1 para `main` está aberta.
+- Commit de partida desta etapa: `4320fb6`. Com autorização do usuário, as alterações desta etapa foram registradas em três commits e enviadas a `origin/feat/edgehealth-mvp` em 06/10/2026, atualizando a PR #1. Os hashes estão em `git log`. Não houve merge na `main` nem force push.
+- Correção: as notas anteriores diziam que a publicação estava bloqueada por autenticação (`403` da integração, `api.github.com` bloqueado). Em 06/10/2026, `gh auth status` confirmou sessão válida, a branch remota coincide com o commit local e a PR foi aberta. O bloqueio não existe mais.
 
-- Backend: 30 testes aprovados, 1 teste ICMP opcional pulado na suíte padrão; cobertura de linhas de 93%.
-- Frontend: build e 15 testes aprovados, com formulários, HTTP real, banco migrado, datasets, download e proxy Vite.
-- Migrations 55463d3f0b18 e 7c7ba005affc verificadas do zero; comparação com modelos sem divergências; importação legada testada.
-- Instalações isoladas verificadas. Backend validado também com dependências reinstaladas offline a partir do cache.
-- ICMP habilitado explicitamente: 1 teste falhou com PermissionError/SocketPermissionError, antes do envio de pacotes. RF08–RF10 aguardam homologação em ambiente que permita ICMP e alcance a LAN.
-- Nenhuma medição simulada foi introduzida no produto. Adaptadores controlados e dados determinísticos existem somente nos testes.
-- Próximo trabalho de campo: roteiro em [DEMO.md](DEMO.md), sem reiniciar implementação ou reverter arquivos.
+## Concluído nesta etapa
 
-Para verificar: siga os comandos do [README](../README.md). Use o lock para recriar a venv se necessário. Confirme `git status` antes de modificar arquivos em uma nova sessão.
+- Coletor remoto: modelo, migration `bc4dfbaec175`, credenciais, ingestão idempotente, heartbeat, telas e cliente em `collector/`.
+- Termos/LGPD: aceite versionado, minutas públicas, retenção, anonimização, backup.
+- Hospedagem: ProxyFix, HSTS, Dockerfile, compose e `docs/DEPLOY.md`.
+- Documentação: README, DEMO, LGPD, DEPLOY, `collector/README.md`, revisão com a matriz RF.
+
+## Testes executados (resultados reais, 06/10/2026)
+
+- Backend: 46 aprovados, 2 pulados; cobertura de 94%.
+- Rede real (`EDGEHEALTH_TEST_REAL_NETWORK=1`): 2 aprovados.
+- Frontend: build aprovado e 16 testes aprovados.
+- Migrations: banco vazio, reaplicação, `db check`, downgrade/upgrade em banco vazio, atualização de `7c7ba005affc` com dados.
+- Ponta a ponta com Waitress, o processo coletor e ICMP real (detalhes em `DEPLOY.md` §7).
+
+## Em andamento
+
+Nada em andamento no código.
+
+## Bloqueios e pendências externas
+
+1. Homologar queda e **recuperação** com equipamento autorizado na rede da demonstração (`DEMO.md`).
+2. Escolher e autorizar o provedor de hospedagem (custo, domínio, TLS, volume). Construir e testar a imagem Docker em máquina com Docker.
+3. Definir controlador, encarregado e contatos; revisar as minutas jurídicas com os professores.
+4. Homologação visual nos navegadores da apresentação.
+
+## Próximo passo exato
+
+1. Escolher, junto com o usuário, um equipamento que possa ser desconectado com segurança (nunca o roteador nem a conexão compartilhada).
+2. Executar o `DEMO.md` (queda e recuperação reais) e registrar o resultado.
+3. Escolher o provedor de hospedagem a partir das opções apresentadas; nada contratado ou publicado antes disso.
+
+## Para retomar em nova sessão
+
+Execute `git status` e confira se o working tree contém as alterações acima. Na pasta `backend`, com o ambiente virtual ativo, rode `python -m pytest -q`. Na pasta `frontend`, rode `npm test`. Não reinicie a implementação nem reverta arquivos.

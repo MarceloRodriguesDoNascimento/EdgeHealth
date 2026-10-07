@@ -1,5 +1,117 @@
 # EdgeHealth — revisão pós-implementação
 
+# Revisão de 06/10/2026 (atual)
+
+Branch `feat/edgehealth-mvp`, publicada em `origin`, ponto de partida no commit `4320fb6`. A PR #1 (`feat/edgehealth-mvp` → `main`) está aberta. Ambiente: Windows 11, Python 3.12.10, Node 22. O trabalho de 09/09 foi preservado; nenhuma migration aplicada foi alterada.
+
+## O que esta etapa acrescentou
+
+| Bloco | Entrega | Evidência |
+|---|---|---|
+| Coletor remoto e ingestão HTTPS | Entidade `Coletor` por empresa; credencial `ehc_` exibida uma vez e guardada como hash SHA-256; rotação e revogação; `GET /api/coletor/configuracao` só com os dispositivos atribuídos; `POST /api/coletor/amostras` com UUID por amostra (índice único `coletor_id, amostra_uid`), timestamps de coleta e recebimento, rejeição de horário futuro (mais de 120 s) e de amostras antigas (mais de 24 h), lote de até 200 itens e 512 KB, 120 requisições/min, heartbeat e estado ATIVO/DESATUALIZADO/NUNCA_CONECTADO/REVOGADO | `services/collectors.py`, `api.py`, `test_collectors.py` |
+| Regras únicas | A ingestão usa o mesmo `claim_device` (lease) e o mesmo `record_result` do worker. O cliente não envia status, severidade nem empresa: campos extras são rejeitados | `services/monitoring.py` |
+| Coordenação worker × coletor | `Dispositivo.coletor_id`: o worker local ignora dispositivos atribuídos a um coletor | `run_cycle`, `collect_device`, `test_local_worker_never_probes_remote_devices` |
+| Fora de ordem | Amostra mais antiga que a última processada é gravada com `fora_de_ordem=True` e status instantâneo, sem mexer em contadores, estado ou ocorrências | `record_result`, teste de amostra atrasada |
+| Problemas do coletor | `PERMISSAO_ICMP`/`FALHA_COLETOR` registram o erro, sem amostra nem falha. O coletor parado aparece como DESATUALIZADO, sem gerar OFFLINE | `test_collector_problems_are_not_device_failures` |
+| Cliente coletor | `collector/edgehealth_collector.py` (stdlib + icmplib): fila em disco limitada, backoff exponencial com jitter, idempotência, heartbeat, aviso de relógio, HTTPS obrigatório, saída com código 2 se a credencial for revogada, logs sem segredo | `test_collector_client.py` (servidor HTTP real) |
+| Termos e privacidade | Aceite com versão e data (separado de consentimento), bloqueio 403 até o aceite, minutas públicas, retenção (`purge-history`), anonimização (`anonymize-user`), backup verificado (`backup`) | `test_privacy_operations.py`, `docs/LGPD.md` |
+| Hospedagem | `ProxyFix` configurável (`TRUST_PROXY`), HSTS com `COOKIE_SECURE`, Dockerfile, compose e entrypoint com migrations | `docs/DEPLOY.md` |
+| Interface | Tela **Coletores** (cadastro, credencial única, rotação, revogação), origem da medição no dispositivo, estado do coletor na lista e no dashboard, aceite dos Termos no cadastro e no primeiro acesso | `Coletores.js`, `Dispositivos.js`, `Dashboard.js`, `Login.js`, `app.js` |
+| Relatórios | `metricas.csv` com `coletor_id`, `recebida_em` e `fora_de_ordem`; `dispositivos.csv` com o coletor | `reports.py` |
+
+**Problema encontrado e corrigido:** a migration gerada automaticamente usava *batch mode*, que recria `dispositivos` e `metricas`. Em um banco com histórico, o SQLite recusa `DROP TABLE dispositivos` (FOREIGN KEY constraint failed). Trocado por `ALTER TABLE ADD COLUMN ... REFERENCES` no SQLite, sem recriar tabelas. O teste `test_upgrade_from_previous_release_preserves_history` reproduz a falha e comprova a correção.
+
+## Testes e resultados reais desta execução
+
+| Verificação | Resultado |
+|---|---|
+| `python -m pytest --cov=app -q` (backend) | **46 aprovados, 2 pulados** (rede real opcional); cobertura **94%** |
+| `EDGEHEALTH_TEST_REAL_NETWORK=1 python -m pytest -m real_network` | **2 aprovados**: ICMP de loopback e coletor remoto real → HTTP → servidor |
+| `npm test` (inclui `npm run build`) | Build aprovado (20 módulos); **16 aprovados**, incluindo o fluxo da tela Coletores e as páginas legais servidas pelo Flask |
+| Migrations | Banco vazio → `bc4dfbaec175`; reaplicação; `db check` sem divergências; downgrade/upgrade em banco vazio; **atualização de `7c7ba005affc` com dados** sem perda e `foreign_key_check` vazio |
+| Ponta a ponta sem mocks (Waitress + processo coletor + ICMP real) | Loopback e gateway da LAN de teste ONLINE (0,958 ms, 0% perda); `192.0.2.1` (RFC 5737) OFFLINE após 3 ciclos, **1** falha, diagnóstico LOCALIZADA, 2 recomendações; dashboard e ZIP coerentes (`DEPLOY.md` §7) |
+| `flask probe` no gateway | 4/4 pacotes; o `ping` do sistema confirma <1 ms. A granularidade do relógio no Windows é de cerca de 0,5 ms |
+| Busca por TODO/mock/fake/random no produto | Só usos legítimos: placeholders de formulário, jitter de backoff e o hash de comparação de tempo constante no login |
+| Docker | **Não executado**: Docker não instalado nesta máquina |
+
+## Matriz RF01–RF20 (06/10/2026)
+
+✅ completo e testado de ponta a ponta no escopo validado · 🟡 parcial · ⚠️ implementado com problema importante · ❌ ausente.
+
+| RF | Status | Backend / persistência / API | Frontend | Testes e evidência | Limitação restante |
+|---|---|---|---|---|---|
+| RF01 Empresa | ✅ | `create_company_account`, `Empresa`, `POST /auth/registro` (exige aceite) | `Login.js`, `Empresa.js` | `test_auth_and_crud`, integração UI | — |
+| RF02 Usuários | ✅ | `save_user`, empresa da sessão, papéis | `Usuarios.js` | `test_auth_and_crud`, `test_tenants_reports` | — |
+| RF03 Login | ✅ | scrypt, sessão hash, expiração, revogação, CSRF, limite, cookie `Secure` com HTTPS | `Login.js`, logout | `test_auth_and_crud`, `test_proxy_and_secure_cookie_configuration` | — |
+| RF04 Cadastro dispositivo | ✅ | `save_device`, validação de IP, origem da medição validada por empresa | `Dispositivos.js` | testes CRUD e coletor | — |
+| RF05 Edição | ✅ | troca de IP reinicia o estado; bloqueada com ocorrência aberta; troca de origem reagenda | `Dispositivos.js` | testes CRUD/coletor, UI | — |
+| RF06 Exclusão | ✅ | arquivamento preserva histórico, encerra ocorrência (ARQUIVAMENTO) e para a coleta (worker e configuração do coletor) | confirmação na UI | `test_monitoring`, UI | — |
+| RF07 Listagem | ✅ | estados auxiliares: aguardando coleta, desatualizado, erro de coleta, estado do coletor | tabela | UI | — |
+| RF08 Disponibilidade real | 🟡 | `real_probe` e cliente coletor; distingue sem resposta de erro do coletor | status | ICMP real aprovado em loopback, no gateway e em endereço inalcançável | Falta homologar na rede de demonstração com queda e recuperação de equipamento autorizado |
+| RF09 Latência real | 🟡 | `latencia_ms` nula sem resposta; timestamps de coleta e recebimento | métricas e gráfico | real: 0,958 ms no gateway | Idem RF08; granularidade de cerca de 0,5 ms no Windows |
+| RF10 Perda real | 🟡 | `(enviados-recebidos)/enviados` com consistência validada no servidor | métricas e gráfico | real: 0% e 100% | Idem RF08 |
+| RF11 Status | ✅ | `classify` com confirmações; limites em `config.py` | badges | `test_monitoring`, `test_collectors` | ICMP bloqueado ≠ desligado (documentado) |
+| RF12 Falhas automáticas | ✅ | índice único de ocorrência aberta + lease; reenvio idempotente | histórico | ingestão concorrente, reenvio, ciclo completo via coletor | Recuperação real pendente (RF08) |
+| RF13 Histórico | ✅ | filtros e paginação | `Historico.js` | UI | — |
+| RF14 Severidade | ✅ | duração, grupo e usuários informados, com justificativa persistida | detalhe | `test_diagnostic_rules` | — |
+| RF15 Diagnóstico | ✅ | `analyze` com janela, pares, histórico e atualidade | `Falha.js` | testes de regras; real: LOCALIZADA | — |
+| RF16 Causas | ✅ | 5 regras e insuficiência, como hipóteses | detalhe | idem | Sem topologia (por escopo) |
+| RF17 Recomendações | ✅ | catálogo com seed idempotente e associação N:N | detalhe | real: 2 recomendações | — |
+| RF18 Impacto | ✅ | duração calculada × estimativa manual × desconhecido | formulário | `test_monitoring`, UI | — |
+| RF19 Dashboard | ✅ | indicadores, séries, desatualização e coletores | `Dashboard.js` | UI (datasets), `test_collectors` | — |
+| RF20 Relatórios | ✅ | ZIP com 4 CSV + metadados, filtros, empresa, BOM UTF-8, anti-fórmula | `Relatorios.js` | `test_isolation_reports`, UI, ponta a ponta | — |
+
+**Estados distintos:** código preparado ✅ · testes automatizados ✅ · ICMP real em laboratório ✅ · homologação na rede da demonstração com queda e recuperação **pendente** · implantado **não** · acessível publicamente **não**.
+
+## Backlog TASK-001–TASK-032
+
+Os títulos individuais não foram recuperados; a documentação anterior só guarda os **agrupamentos** reproduzidos na seção de 09/09, abaixo. Situação atual por grupo:
+
+- TASK-001–TASK-014 e TASK-019–TASK-031: concluídas na revisão anterior. Foram revalidadas pela suíte desta execução e não houve regressão.
+- TASK-015–TASK-018 (coleta real, persistência, periodicidade, classificação): passam de 🟡 para **✅ em laboratório**, com ICMP real nesta máquina. O aceite de campo segue no roteiro de RF08.
+- TASK-032 (aceite e regressão): **✅ automatizado**; o teste real, que antes falhava por permissão, agora passa. Pendente apenas o roteiro de demonstração em campo.
+
+## Novas tarefas
+
+| ID | Tarefa | Estado |
+|---|---|---|
+| CLOUD-001 | Modelo e migration de coletor, origem por dispositivo e metadados de ingestão | ✅ |
+| CLOUD-002 | Credencial do coletor: hash, rotação, revogação e exibição única | ✅ |
+| CLOUD-003 | API de configuração, ingestão idempotente e heartbeat | ✅ |
+| CLOUD-004 | Amostras atrasadas ou fora de ordem e limites de tempo | ✅ |
+| CLOUD-005 | Coordenação worker × coletor (lease compartilhado) | ✅ |
+| CLOUD-006 | Cliente coletor com fila, backoff, HTTPS e logs sem segredo | ✅ |
+| CLOUD-007 | Telas Coletores, origem da medição e estado no dashboard | ✅ |
+| CLOUD-008 | Dockerfile, compose, entrypoint com migrations e health | 🟡 escrito; não construído (sem Docker) |
+| CLOUD-009 | Implantação em provedor | ❌ depende de decisão e autorização da equipe |
+| CLOUD-010 | PostgreSQL (somente se o provedor exigir) | ❌ não iniciado; justificativa em `DEPLOY.md` §2 |
+| LGPD-001 | Inventário de dados, bases sugeridas e retenção | ✅ minuta |
+| LGPD-002 | Termos de Uso e Aviso de Privacidade públicos | ✅ minutas; revisão humana pendente |
+| LGPD-003 | Registro de aceite e ciência por versão, separado de consentimento | ✅ |
+| LGPD-004 | Retenção (`purge-history`) e anonimização (`anonymize-user`) | ✅ |
+| LGPD-005 | Procedimentos de titulares e de incidentes | ✅ minuta |
+| LGPD-006 | Definir controlador, encarregado, contatos e provedores | ❌ informação externa |
+| HARDENING-001 | ProxyFix, HSTS, cookie `Secure` com HTTPS | ✅ |
+| HARDENING-002 | Migration segura em SQLite com histórico | ✅ |
+| HARDENING-003 | Backup verificado e procedimento de restauração | ✅ |
+| HARDENING-004 | Rate limit e tamanho de lote do coletor | ✅ |
+
+## Estimativa de conclusão por área (pelo comportamento validado)
+
+| Área | Estimativa | Fundamento |
+|---|---:|---|
+| Monitoramento e coleta | 90% | ICMP real e pipeline de ponta a ponta validados em laboratório; falta a queda e recuperação real na rede da demonstração |
+| Persistência e histórico | 95% | Migrations do zero e de atualização com dados; retenção. Sem PostgreSQL |
+| Falhas, severidade, diagnóstico e recomendações | 95% | Regras testadas e exercitadas com dados reais; recuperação real pendente |
+| Segurança e isolamento | 95% | Sessão, coletor, CSRF, isolamento e limites testados. Sem pentest externo, por escopo |
+| Interface | 90% | Fluxos testados por DOM/HTTP; falta homologação visual nos navegadores da apresentação |
+| Arquitetura hospedada | 70% | Caminho funcional validado sem contêiner; imagem não construída; nada implantado |
+| Privacidade / LGPD | 70% | Medidas técnicas implementadas; documentos são minutas sem responsáveis definidos |
+
+---
+
+# Revisão anterior (09/09/2026), mantida como histórico
+
 Data: **09/09/2026**. Branch local: `feat/edgehealth-mvp`. Base: `fc60d981e783270e3d6caeed72f88bd1d9e91029`.
 
 ## Resultado e escopo
@@ -176,7 +288,7 @@ Cobertura de linhas não mede a completude funcional nem prova comportamento de 
 
 1. **RF08–RF10 / aceite de rede:** executar o teste real e o roteiro na máquina/LAN da equipe. Exige permissão ICMP do SO e conectividade aos alvos. O teste real deste ambiente falhou na criação do socket, antes de enviar pacotes; não há alteração de regra de negócio que transforme esse resultado em medição confiável.
 2. **Homologação de navegação final:** validar os navegadores usados pela equipe. Os fluxos autenticados foram testados em DOM/HTTP; o ambiente de visualização não compartilha a rede do processo Flask externo, limitando a inspeção visual autenticada. O proxy Vite foi validado separadamente no teste HTTP real.
-3. **Publicação no GitHub:** o código está no commit local `f2a7dfe`, branch `feat/edgehealth-mvp`, e o usuário autorizou explicitamente a publicação. O plugin GitHub foi conectado: leitura do repositório e permissão de escrita da conta foram confirmadas. A criação da árvore Git pela integração retornou `403: Resource not accessible by integration`; não foi criada branch nem commit remoto. O usuário concluiu o fluxo do GitHub CLI no navegador, mas o ambiente bloqueou `https://api.github.com:443` antes de salvar a sessão. A política também recusou a ampliação de permissões de execução/rede. `gh auth status` confirmou ausência de sessão salva. O envio exige um ambiente com acesso autorizado à API do GitHub; foi preparado um bundle dos commits para publicação no computador da equipe. Repetir o login aqui sem resolver o bloqueio não conclui a autenticação. A autorização de envio permanece concedida. Isso não altera os resultados dos testes ou o código local.
+3. **Publicação no GitHub** (*superado em 06/10/2026: a branch foi publicada em `origin` e a PR #1 foi aberta; texto original abaixo*): o código está no commit local `f2a7dfe`, branch `feat/edgehealth-mvp`, e o usuário autorizou explicitamente a publicação. O plugin GitHub foi conectado: leitura do repositório e permissão de escrita da conta foram confirmadas. A criação da árvore Git pela integração retornou `403: Resource not accessible by integration`; não foi criada branch nem commit remoto. O usuário concluiu o fluxo do GitHub CLI no navegador, mas o ambiente bloqueou `https://api.github.com:443` antes de salvar a sessão. A política também recusou a ampliação de permissões de execução/rede. `gh auth status` confirmou ausência de sessão salva. O envio exige um ambiente com acesso autorizado à API do GitHub; foi preparado um bundle dos commits para publicação no computador da equipe. Repetir o login aqui sem resolver o bloqueio não conclui a autenticação. A autorização de envio permanece concedida. Isso não altera os resultados dos testes ou o código local.
 
 CSV atende ao formato autorizado. Impacto manual identificado, ausência de descoberta de topologia, um ponto coletor e ausência de retenção automática são decisões de escopo documentadas; não foram substituídas por estimativas inventadas. A duração é da ocorrência observada, não uma medida contínua exata de downtime.
 

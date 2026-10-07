@@ -4,22 +4,34 @@ Monitoramento e diagnóstico lógico de redes para pequenas e médias empresas. 
 
 A implementação oficial está em `backend/` e `frontend/`. As cópias divergentes foram consolidadas; o histórico anterior permanece no Git. Não há seed de usuários, dispositivos, métricas ou falhas no produto.
 
-**Validação de 09/09/2026:** regras, persistência, autenticação, isolamento e interface com API HTTP real foram testados. A homologação do ICMP real está pendente em uma máquina com permissão de socket e acesso à LAN. Aqui, o sistema operacional rejeitou o socket ICMP; o coletor registra o erro sem inventar métricas. Consulte [a revisão final](docs/POST_IMPLEMENTATION_REVIEW.md) e [a demonstração](docs/DEMO.md).
+**Validação de 06/10/2026** (Windows 11, Python 3.12.10, Node 22):
+
+- Backend: 46 testes aprovados; os 2 testes opcionais de rede real foram pulados na suíte padrão.
+- Frontend: 16 testes aprovados e build concluído.
+- ICMP real: aprovado nesta máquina em loopback e no gateway da LAN de teste, inclusive pelo coletor remoto enviando por HTTP.
+
+Isso foi homologado em laboratório, não na rede de uma empresa cliente, e a aplicação **não está hospedada**. Detalhes em [o checkpoint](docs/IMPLEMENTATION_STATUS.md), [a revisão](docs/POST_IMPLEMENTATION_REVIEW.md), [a hospedagem](docs/DEPLOY.md), [a privacidade](docs/LGPD.md) e [a demonstração](docs/DEMO.md).
 
 ## Arquitetura
 
 ```mermaid
 flowchart TD
-  UI["Navegador: JavaScript e Chart.js"] -->|"mesma origem /api"| API["Flask: sessão e autorização"]
+  UI["Navegador: JavaScript e Chart.js"] -->|"HTTPS, mesma origem /api"| API["Flask: sessão, autorização e regras"]
   API --> DB["SQLite: cadastros e histórico"]
-  WORKER["Worker independente: flask monitor"] -->|"ICMP limitado por timeout"| LAN["Dispositivos autorizados da LAN"]
-  WORKER -->|"métricas, status, falhas e diagnóstico"| DB
-  DB -->|"inventário e agendamento"| WORKER
+  COL["Coletor remoto na rede da empresa"] -->|"ICMP"| LAN["Dispositivos da rede privada"]
+  COL -->|"HTTPS de saída, credencial própria, amostras idempotentes"| API
+  WORKER["Worker local: flask monitor"] -->|"ICMP"| NEAR["Dispositivos alcançáveis pelo servidor"]
+  WORKER -->|"mesmo pipeline: status, falhas, diagnóstico"| DB
 ```
 
-Backend: Flask, SQLAlchemy e Flask-Migrate/Alembic, com services de autenticação, cadastros, coleta, regras, consultas e relatórios. Frontend: JavaScript em módulos ES, Vite e Chart.js. SQLite é o banco validado para o MVP. Outro banco e operação distribuída não foram homologados.
+Backend: Flask, SQLAlchemy e Flask-Migrate/Alembic, com services de autenticação, cadastros, coleta, ingestão remota, regras, consultas, relatórios e privacidade. Frontend: JavaScript em módulos ES, Vite e Chart.js. Coletor: Python, com biblioteca padrão e icmplib. SQLite é o banco validado para uma instância (ver [DEPLOY.md](docs/DEPLOY.md)).
 
-O worker deve executar onde alcance os IPs cadastrados. Hospedar somente a interface na Internet não fornece acesso à rede privada da empresa.
+**Rede privada:** um servidor hospedado na Internet não alcança `192.168.x.x` da empresa. Cada dispositivo tem uma **origem da medição**:
+
+- **worker local**, para o que o próprio servidor alcança;
+- **coletor remoto** instalado na rede da empresa ([collector/README.md](collector/README.md)).
+
+O coletor só mede e envia. Status, ocorrências, severidade e diagnóstico são sempre calculados no servidor, pelo mesmo `record_result` usado pelo worker. O worker nunca mede um dispositivo atribuído a um coletor.
 
 ## Pré-requisitos
 
@@ -117,7 +129,7 @@ Flask serve build e API em `http://localhost:5000`. Mantenha `python -m flask --
 
 ## Primeiro acesso e segurança
 
-Na tela de login, escolha **Cadastrar minha empresa**. Informe empresa, CNPJ, nome, e-mail e senha de 10 a 128 caracteres. A primeira conta administra a empresa criada; cadastre a equipe em **Equipe**. Dispositivos exigem nome, IP, tipo e localização; a empresa vem da sessão.
+Na tela de login, escolha **Cadastrar minha empresa**. Informe empresa, CNPJ, nome, e-mail e senha de 10 a 128 caracteres, e marque o aceite dos Termos de Uso e a ciência do Aviso de Privacidade (versão e data ficam registradas; não é consentimento). Contas criadas pelo administrador aceitam os Termos no primeiro acesso. A primeira conta administra a empresa criada; cadastre a equipe em **Equipe**. Dispositivos exigem nome, IP, tipo e localização; a empresa vem da sessão.
 
 Senhas usam scrypt/Werkzeug. A sessão é opaca e aleatória, com cookie HttpOnly/SameSite e somente hashes dos tokens no banco. Alterações exigem CSRF. Logout, troca de senha, permissão ou desativação revogam sessões. Tentativas de login são limitadas de forma persistida. Não há token em localStorage.
 
@@ -194,8 +206,13 @@ Relatórios geram ZIP com `dispositivos.csv`, `metricas.csv`, `falhas.csv`, `dia
 | PUT | `/api/falhas/{id}/impacto` | Estimativa e recálculo |
 | GET | `/api/diagnosticos/{id}`, `/api/recomendacoes` | Análise e catálogo |
 | GET | `/api/dashboard`, `/api/relatorios/exportar` | Dashboard / ZIP |
+| GET / POST | `/api/termos`, `/api/auth/aceite-termos` | Versão vigente / aceite dos Termos |
+| GET / POST | `/api/coletores` | Lista (todos os membros) / cadastro com credencial exibida uma vez (admin) |
+| POST | `/api/coletores/{id}/rotacionar`, `/api/coletores/{id}/revogar` | Nova credencial / revogação (admin) |
+| GET | `/api/coletor/configuracao` | **Coletor** (Bearer): dispositivos atribuídos e parâmetros |
+| POST | `/api/coletor/amostras`, `/api/coletor/heartbeat` | **Coletor**: lote idempotente de amostras e erros / sinal de vida |
 
-Exceto health, registro e login, rotas exigem sessão. Não há escrita manual de métricas/status/falhas. Erros comuns retornam JSON e HTTP 400/401/403/404/409/422/429, com rollback das alterações inconsistentes.
+Exceto health, termos, registro, login e as rotas `/api/coletor/*` (credencial `Authorization: Bearer ehc_...`, sem cookie e sem CSRF), as rotas exigem sessão. Contas com Termos pendentes recebem 403 até aceitar. Lotes têm limite de 200 itens, 512 KB e 120 requisições/min por coletor. Não há escrita manual de métricas/status/falhas. Erros comuns retornam JSON e HTTP 400/401/403/404/409/422/429, com rollback das alterações inconsistentes.
 
 ## Testes
 
@@ -230,10 +247,28 @@ python -m pytest -m real_network -q
 Remove-Item Env:EDGEHEALTH_TEST_REAL_NETWORK
 ```
 
-Sem a variável, o teste real é explicitamente pulado. Aqui a tentativa real falhou com `SocketPermissionError`; aprovar sondagens controladas não aprova o ICMP real.
+Sem a variável, os 2 testes reais são pulados. Em 06/10/2026, ambos passaram nesta máquina Windows: sondagem de loopback, e o coletor remoto medindo o loopback e enviando ao servidor por HTTP. Em 09/09/2026, outro ambiente havia recusado o socket (`SocketPermissionError`). Aprovar sondagens controladas não aprova o ICMP real de cada máquina: rode o teste em cada coletor.
+
+O que cada suíte cobre:
+
+- `test_collectors.py`: credenciais do coletor, isolamento, idempotência, amostras fora de ordem, validação, permissão ICMP, coletor desatualizado, limite de taxa e concorrência.
+- `test_collector_client.py`: o cliente real contra um servidor HTTP real, com queda da API, fila em disco, reinício, ciclo de falha e revogação.
+- `test_privacy_operations.py`: retenção, anonimização, backup, cookies `Secure` e proxy.
 
 ## Limites conhecidos
 
-RF01–RF20 estão cobertos em código; RF08–RF10 têm aceite de campo pendente pela permissão ICMP do ambiente. O restante do fluxo foi exercitado com sondagens determinísticas isoladas. Não há dados simulados em produção.
+RF01–RF20 estão implementados e testados. O ICMP real foi validado em laboratório (loopback e gateway da LAN de teste). Falta homologar na rede da empresa usada na demonstração, com queda e recuperação controladas de um equipamento autorizado ([DEMO.md](docs/DEMO.md)). Não há dados simulados em produção.
 
-O MVP mede a partir de um ponto de rede, não descobre topologia nem calcula usuários automaticamente. Histórico cresce sem retenção automática. Escala elevada, LANs isoladas e outro banco exigem planejamento próprio. CSV atende RF20; PDF/XLSX não fazem parte desta entrega. Veja [o roteiro de demonstração](docs/DEMO.md) para homologar na LAN da equipe.
+O MVP mede a partir de um ponto de rede por dispositivo. Ele não descobre topologia nem calcula usuários automaticamente. Amostras brutas seguem retenção de 180 dias (`flask purge-history`). PostgreSQL, múltiplas instâncias e a imagem Docker não foram executados. A aplicação está pronta para implantação, mas **não está implantada nem acessível publicamente**. CSV atende RF20; PDF/XLSX não fazem parte desta entrega. As minutas jurídicas ([Termos](frontend/public/termos.html), [Privacidade](frontend/public/privacidade.html), [LGPD.md](docs/LGPD.md)) precisam de revisão pelos responsáveis.
+
+## Operação, hospedagem e privacidade
+
+Dentro de `backend/`, com o ambiente virtual ativo:
+
+```bash
+python -m flask --app run.py backup --output CAMINHO_DO_BACKUP.db   # cópia consistente, nunca sobrescreve
+python -m flask --app run.py purge-history --dry-run                 # retenção (padrão 180 dias)
+python -m flask --app run.py anonymize-user --email PESSOA --yes     # pedido de titular
+```
+
+Hospedagem, Docker, variáveis de produção, restauração e atualização: [docs/DEPLOY.md](docs/DEPLOY.md). Inventário de dados, bases legais sugeridas, titulares e incidentes: [docs/LGPD.md](docs/LGPD.md).

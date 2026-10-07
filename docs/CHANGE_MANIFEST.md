@@ -1,5 +1,32 @@
 # Arquivos da implementação
 
+## Etapa de 06/10/2026 (coletor remoto, hospedagem e privacidade), sobre `4320fb6`
+
+**Criados:**
+
+- Raiz: `.dockerignore`, `.gitattributes`, `Dockerfile`, `docker-compose.yml`.
+- Backend: `backend/docker-entrypoint.sh`, `backend/app/services/collectors.py`, `backend/app/services/privacy.py`, `backend/migrations/versions/bc4dfbaec175_remote_collectors_idempotent_ingestion_.py`.
+- Testes do backend: `backend/tests/test_collectors.py`, `backend/tests/test_collector_client.py`, `backend/tests/test_privacy_operations.py`.
+- Coletor: `collector/edgehealth_collector.py`, `collector/requirements.txt`, `collector/README.md`.
+- Documentação: `docs/DEPLOY.md`, `docs/LGPD.md`.
+- Frontend: `frontend/public/termos.html`, `frontend/public/privacidade.html`, `frontend/public/legal.css`, `frontend/src/pages/Coletores.js`.
+
+**Alterados:**
+
+- Raiz: `.gitignore`, `README.md`.
+- Backend: `backend/.env.example`, `backend/app/__init__.py`, `api.py`, `cli.py`, `config.py`, `models.py`, `services/auth.py`, `services/management.py`, `services/monitoring.py`, `services/queries.py`, `services/reports.py`, `services/serialization.py`.
+- Testes do backend: `backend/tests/conftest.py`, `test_auth_and_crud.py`, `test_legacy_and_migrations.py`.
+- Documentação: `docs/CHANGE_MANIFEST.md`, `docs/DEMO.md`, `docs/IMPLEMENTATION_STATUS.md`, `docs/POST_IMPLEMENTATION_REVIEW.md`.
+- Frontend: `frontend/src/app.js`, `pages/Dashboard.js`, `pages/Dispositivos.js`, `pages/Login.js`, `styles.css`, `frontend/tests/integration.test.js`.
+
+**Removidos:** nenhum.
+
+**Dependências:** nenhuma nova no backend nem no frontend. O coletor usa somente `icmplib==3.0.4`, que já era dependência do backend.
+
+---
+
+## Etapa de 09/09/2026
+
 Comparação com o commit base `fc60d981e783270e3d6caeed72f88bd1d9e91029`, incluindo o trabalho preservado da execução anterior. Ambientes virtuais, node_modules, builds, bancos operacionais e caches não fazem parte da entrega versionada.
 
 Contagem por caminho, sem detecção de renomeação: a mudança de `frontend/public/index.html` para `frontend/index.html` aparece como remoção e criação.
