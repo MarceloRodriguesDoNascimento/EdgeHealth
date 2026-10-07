@@ -42,6 +42,11 @@ def analyze(failure, related, now):
     samples = db.session.scalars(select(Metrica).where(Metrica.dispositivo_id==device.id,
         Metrica.coletada_em>=window_start, Metrica.coletada_em<=now).order_by(Metrica.coletada_em.desc(),Metrica.id.desc()).limit(20)).all()
     diag=db.session.scalar(select(Diagnostico).where(Diagnostico.falha_id==failure.id))
+    # Re-analysis triggered by another device's sample (e.g. a collector catching up after an
+    # outage) may find no sample of this device in the window: that is missing data, not new
+    # evidence, so it must not replace the existing explanation with EVIDENCIA_INSUFICIENTE.
+    if not samples and diag:
+        return diag
     latest=samples[0] if samples else None
     recovering = (latest and latest.status == 'INSTAVEL' and latest.respondeu
                   and latest.latencia_ms is not None and latest.latencia_ms < cfg['LATENCY_LIMIT_MS']
@@ -58,10 +63,17 @@ def analyze(failure, related, now):
     causes=[]
     if latest and latest.status=='OFFLINE' and any(p.status=='ONLINE' for p in peers):
         causes.append(dict(regra='LOCALIZADA', descricao='Possível problema localizado no dispositivo, alimentação, cabo, porta ou política de resposta ICMP; outros dispositivos da empresa responderam.'))
-    offline_ids = {p.id for p in peers if p.status == 'OFFLINE'} | {device.id}
-    offline_related = [f for f in related if f.tipo=='INDISPONIBILIDADE'
-                       and f.estado=='ABERTA' and f.dispositivo_id in offline_ids]
-    if latest and latest.status=='OFFLINE' and len({f.dispositivo_id for f in offline_related})>=2:
+    # Correlation uses the incidents, not the peers' status at this instant: in a group outage
+    # the peers recover in collector/batch order, and an analysis between two recoveries must
+    # not drop COMPARTILHADA from the device still offline. A peer counts when its confirmed
+    # unavailability overlapped this one and either already ended (observed outage) or is
+    # still open with a current observation (stale peers are not evidence).
+    current_peers = {p.id for p in peers}
+    shared = {device.id} | {f.dispositivo_id for f in related
+                            if f.tipo=='INDISPONIBILIDADE' and f.dispositivo_id!=device.id
+                            and ((f.estado=='ABERTA' and f.dispositivo_id in current_peers)
+                                 or (f.estado=='ENCERRADA' and f.fim and f.fim>=failure.inicio))}
+    if latest and latest.status=='OFFLINE' and len(shared)>=2:
         causes.append(dict(regra='COMPARTILHADA', descricao='Possível interrupção de infraestrutura compartilhada: vários dispositivos ficaram indisponíveis em uma janela semelhante. A topologia não foi determinada.'))
     if latest and latest.respondeu and latest.latencia_ms is not None:
         if latest.latencia_ms>=cfg['LATENCY_LIMIT_MS'] and latest.perda_pacotes_pct>=cfg['LOSS_LIMIT_PCT']:
@@ -95,11 +107,21 @@ def analyze(failure, related, now):
 
 def refresh_company(company_id, now=None, extra_failure=None):
     now=now or utcnow()
+    window=current_app.config['DIAGNOSTIC_WINDOW_SECONDS']
     failures=db.session.scalars(select(Falha).join(Dispositivo).where(Dispositivo.empresa_id==company_id,Falha.estado=='ABERTA')).all()
     if extra_failure and extra_failure.id not in {f.id for f in failures}:
         failures.append(extra_failure)
+    # Incidents already closed still belong to the same event: without them, the severity
+    # group and the shared-outage hypothesis of the last open incidents would shrink as the
+    # other devices recover.
+    pool=list(failures)
+    if failures:
+        earliest=min(f.inicio for f in failures)-timedelta(seconds=window)
+        ids={f.id for f in failures}
+        pool+=[f for f in db.session.scalars(select(Falha).join(Dispositivo).where(Dispositivo.empresa_id==company_id,
+               Falha.estado=='ENCERRADA',Falha.inicio>=earliest)) if f.id not in ids]
     for failure in failures:
-        related=[f for f in failures if abs((f.inicio-failure.inicio).total_seconds())<=current_app.config['DIAGNOSTIC_WINDOW_SECONDS']]
+        related=[f for f in pool if abs((f.inicio-failure.inicio).total_seconds())<=window]
         recalculate_severity(failure,len({f.dispositivo_id for f in related}),now)
         # Keep the diagnosis that explained an incident at its last anomalous observation.
         if failure.estado=='ABERTA':
