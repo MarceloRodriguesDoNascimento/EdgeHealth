@@ -22,9 +22,67 @@ Na interface, como administrador: **Coletores → Cadastrar coletor**. Copie a c
 
 Depois, em **Dispositivos → Editar → Origem da medição**, escolha o coletor para cada dispositivo da rede privada.
 
-## 2. Instalar — Windows (PowerShell)
+## 2. Instalar no Windows (sem terminal e sem Python)
 
-Requer Python 3.12 ou superior. Abra o PowerShell **na pasta `collector` do repositório** e confira com `Get-Location` que o caminho termina em `\collector`. Se o ZIP foi extraído em uma pasta dentro de outra com o mesmo nome, entre na pasta que contém `edgehealth_collector.py`.
+Use um computador que fique ligado e conectado à rede que você quer monitorar.
+
+1. No site, em **Coletores**, clique em **Baixar coletor para Windows**. O arquivo é o `EdgeHealthColetor.exe` (cerca de 12 MB).
+2. Dê dois cliques no arquivo baixado.
+3. **Aviso do Windows (SmartScreen).** Na primeira vez, pode aparecer a tela azul **"O Windows protegeu o computador"**. Ela aparece porque o programa ainda não tem assinatura digital paga, não porque foi encontrado algum problema. Clique em **Mais informações** e depois em **Executar assim mesmo**. Se o botão não aparecer, o computador é gerenciado pela empresa e a instalação precisa ser liberada pela equipe de TI.
+   - Para conferir que o arquivo é o original, compare o SHA-256 publicado na página da versão (Releases do GitHub) com o resultado de `Get-FileHash EdgeHealthColetor.exe` no PowerShell.
+4. Na janela **Coletor EdgeHealth**, o endereço do EdgeHealth já vem preenchido. Cole a credencial e clique em **Conectar**.
+
+   ![Primeira execução: endereço preenchido e campo da credencial](docs/img/01-primeira-execucao.png)
+
+5. Se der certo, aparece **"Conectado — N dispositivos"** e o coletor é instalado e iniciado. Pode fechar a janela: ele continua rodando escondido e volta sozinho quando o Windows reiniciar.
+
+   ![Conectado e instalado](docs/img/03-conectado.png)
+
+   Se algo estiver errado, a mensagem diz o que fazer:
+
+   ![Credencial inválida ou revogada](docs/img/02-credencial-invalida.png)
+
+   | Mensagem | O que fazer |
+   |---|---|
+   | Credencial inválida ou revogada | Gere uma nova credencial em **Coletores → Nova credencial** e cole de novo. |
+   | Sem conexão com o servidor | Verifique a internet do computador e o endereço do EdgeHealth. |
+   | O relógio deste computador está N min adiantado/atrasado | **Configurações → Hora e idioma → Data e hora → Sincronizar agora**. O servidor recusa medições com relógio errado. |
+   | A credencial começa com "ehc_" | Copie a credencial inteira da tela Coletores. |
+
+6. No site, em **Coletores**, a situação passa a **Ativo** em até um minuto.
+
+### Para todo o computador ou só para o seu usuário
+
+- **Com permissão de administrador** (botão **Instalar para todo o computador**, que pede confirmação do Windows): o coletor inicia **junto com o Windows**, mesmo sem ninguém entrar, e guarda os dados em `C:\ProgramData\EdgeHealth`. É o recomendado para um computador que fica ligado.
+- **Sem administrador**: o coletor inicia **quando você entra no Windows** e guarda os dados em `%LOCALAPPDATA%\EdgeHealth`.
+
+Em ambos os casos ele roda como uma tarefa agendada oculta (**EdgeHealth Coletor**), sem janela, sem limite de tempo, também na bateria, e é reiniciado a cada minuto se parar com erro.
+
+### Depois de instalado
+
+Abra o `EdgeHealthColetor.exe` de novo (o baixado ou a cópia em `C:\ProgramData\EdgeHealth`) para ver a situação e usar os botões:
+
+![Coletor instalado](docs/img/04-instalado.png)
+
+- **Testar conexão**: confere credencial, internet e relógio.
+- **Parar coletor**: encerra o coletor e impede que ele inicie com o Windows, até você clicar em **Iniciar coletor**.
+- **Abrir pasta de logs**: `logs\coletor.log`, com rotação (5 arquivos de 1 MB). A credencial nunca é gravada no log.
+- **Desinstalar**: remove a tarefa agendada e toda a pasta de dados (credencial, fila e logs). Depois, apague o arquivo baixado. No site, use **Revogar** se o coletor não for mais usado.
+
+Arquivos na pasta de dados, com acesso só para SISTEMA, Administradores e (instalação por usuário) o próprio usuário: `config.json` (endereço), `coletor.token` (credencial), `fila.jsonl` (medições ainda não enviadas), `logs\` e uma cópia do `EdgeHealthColetor.exe`.
+
+**Instalação sem janela** (TI e implantação em massa), no PowerShell como administrador:
+
+```powershell
+.\EdgeHealthColetor.exe --instalar --url https://marcelodomingos.pythonanywhere.com --token-file C:\caminho\coletor.token
+.\EdgeHealthColetor.exe --parar      # ou --iniciar / --desinstalar
+```
+
+## 3. Instalação manual pelo terminal (Linux e avançado)
+
+### Windows pelo terminal (avançado)
+
+Para quem prefere rodar o código-fonte. Requer Python 3.12 ou superior. Abra o PowerShell **na pasta `collector` do repositório** e confira com `Get-Location` que o caminho termina em `\collector`. Se o ZIP foi extraído em uma pasta dentro de outra com o mesmo nome, entre na pasta que contém `edgehealth_collector.py`.
 
 ```powershell
 py -3 -m venv .venv
@@ -49,7 +107,9 @@ Execução contínua: `python edgehealth_collector.py --api-url https://edgeheal
 
 No Windows 11 deste projeto, o ICMP funcionou sem privilégios de administrador. A latência medida tem granularidade de cerca de 0,5 ms. Um equipamento na mesma LAN pode aparecer com `0` ms, o mesmo que o `ping` do sistema mostra como `<1ms`.
 
-## 2. Instalar — Linux (bash)
+Se aparecer `CERTIFICATE_VERIFY_FAILED: certificate has expired`, o repositório de certificados do Windows não aceita a cadeia atual do Let's Encrypt (aconteceu no Windows 11 deste projeto). Use o `EdgeHealthColetor.exe`, que traz o próprio pacote de certificados, ou instale o coletor no Linux.
+
+### Linux (bash)
 
 ```bash
 cd collector                # pasta que contém edgehealth_collector.py
@@ -89,6 +149,12 @@ WantedBy=multi-user.target
 | `--workers` | `EDGEHEALTH_WORKERS` | 4 (1–16) |
 | `--once` | — | executa um ciclo e encerra |
 | `--allow-http` | — | somente laboratório, sem TLS |
+
+## Publicar uma nova versão do .exe (mantenedores)
+
+1. No Windows, na raiz do repositório: `powershell -ExecutionPolicy Bypass -File collector\windowsuild.ps1`. Gera `collector\dist\EdgeHealthColetor.exe` e o arquivo `.sha256`. As versões das ferramentas estão fixas em `collector\windowsequirements-build.txt`.
+2. No GitHub, crie uma release e anexe **exatamente** `EdgeHealthColetor.exe` (o link do site aponta para `releases/latest/download/EdgeHealthColetor.exe`). Cole o SHA-256 na descrição.
+3. O `.exe` nunca vai para o repositório nem para o servidor do EdgeHealth.
 
 ## Operação
 
