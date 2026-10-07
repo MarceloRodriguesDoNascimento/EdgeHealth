@@ -92,6 +92,7 @@ test('interface completa usa a API HTTP e SQLite migrado, sem respostas HTTP sim
     mount(Login(data=>{session=data;},true));
     await submit({nome_fantasia:'Empresa de integração',cnpj:'11222333000181',nome:'Administrador',email:'admin@integration.example',senha:'test-integration-password',aceite_termos:true});
     assert.equal(session.usuario.papel,'ADMIN');assert.equal(session.usuario.termos_pendentes,false);
+    assert.equal(document.querySelector('img.brand-logo').alt,'EdgeHealth');
     assert.equal((await apiFetch('/empresa')).nome_fantasia,'Empresa de integração');
     await apiFetch('/auth/logout',{method:'POST',body:'{}'});
     mount(Login(data=>{session=data;}));
@@ -201,11 +202,27 @@ test('interface completa usa a API HTTP e SQLite migrado, sem respostas HTTP sim
     assert.equal(download.type,'application/zip');
     const bytes=new Uint8Array(await download.arrayBuffer());assert.deepEqual([...bytes.slice(0,2)],[80,75]);
     assert.ok(bytes.length>1000);
-    mount(await Dispositivos(session));button('Arquivar').click();button('Confirmar',document.querySelector('dialog')).click();
+    mount(await Dispositivos(session));button('Arquivar').click();
+    assert.equal(document.querySelector('dialog h2').textContent,'Arquivar dispositivo?');
+    button('Arquivar',document.querySelector('dialog')).click();
     await until(()=>!document.querySelector('dialog'),'Arquivamento pendente');
     assert.equal((await apiFetch('/dispositivos')).length,0);
     assert.equal((await apiFetch('/metricas')).total,9);
     assert.equal((await apiFetch('/falhas')).total,1);
+    // Restore from the "Incluir arquivados" view, then archive again.
+    const include=document.querySelector('[name=arquivados]');include.checked=true;include.dispatchEvent(new Event('change'));
+    await until(()=>[...document.querySelectorAll('button')].some(b=>b.textContent==='Desarquivar'),'Botão Desarquivar ausente');
+    button('Desarquivar').click();
+    assert.match(document.querySelector('dialog').textContent,/voltará a ser monitorado/);
+    button('Desarquivar',document.querySelector('dialog')).click();
+    await until(()=>!document.querySelector('dialog'),'Desarquivamento pendente');
+    const restored=await apiFetch('/dispositivos');
+    assert.equal(restored.length,1);assert.equal(restored[0].arquivado_em,null);assert.equal(restored[0].status,null);
+    assert.equal((await apiFetch('/metricas')).total,9);  // history preserved
+    await until(()=>[...document.querySelectorAll('button')].some(b=>b.textContent==='Arquivar'),'Lista não atualizou');
+    button('Arquivar').click();button('Arquivar',document.querySelector('dialog')).click();
+    await until(()=>!document.querySelector('dialog'),'Novo arquivamento pendente');
+    assert.equal((await apiFetch('/dispositivos')).length,0);
     await apiFetch('/auth/logout',{method:'POST',body:'{}'});
     await assert.rejects(apiFetch('/dispositivos'),error=>error.status===401);
   });
@@ -218,8 +235,12 @@ test('interface completa usa a API HTTP e SQLite migrado, sem respostas HTTP sim
     assert.equal((await nativeFetch(base+asset)).status,200);
     for(const page of ['/termos.html','/privacidade.html']){
       const legal=await nativeFetch(base+page);
-      assert.equal(legal.status,200);assert.match(await legal.text(),/MINUTA/);
+      assert.equal(legal.status,200);const text=await legal.text();
+      assert.match(text,/MINUTA/);assert.match(text,/rel="icon"[^>]*\/logo\.svg/);
     }
+    assert.match(html,/rel="icon"[^>]*\/logo\.svg/);
+    const logo=await nativeFetch(base+'/logo.svg');
+    assert.equal(logo.status,200);assert.match(logo.headers.get('content-type'),/image\/svg\+xml/);
     const oldTarget=process.env.API_PROXY_TARGET;
     process.env.API_PROXY_TARGET=base;
     let vite;

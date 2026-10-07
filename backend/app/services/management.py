@@ -111,6 +111,27 @@ def save_device(data,id=None):
     return device
 
 
+def restore_device(id):
+    device=scoped_device(id)
+    if not device.arquivado_em:
+        raise Conflict('O dispositivo não está arquivado.')
+    duplicate=db.session.scalar(select(Dispositivo.id).where(Dispositivo.empresa_id==device.empresa_id,
+        Dispositivo.ip==device.ip,Dispositivo.arquivado_em.is_(None)))
+    if duplicate:
+        raise Conflict('Já existe um dispositivo ativo com este IP. Arquive-o ou altere o IP antes de desarquivar.')
+    device.arquivado_em=None
+    # History is preserved; the current state restarts from a fresh measurement instead of showing stale data.
+    device.status=None
+    device.ultima_coleta=None
+    device.latencia_ms=device.perda_pacotes_pct=None
+    device.falhas_consecutivas=device.sucessos_consecutivos=0
+    device.erro_coleta=None
+    device.lease_owner=device.lease_until=None
+    device.proxima_coleta=utcnow()
+    db.session.commit()
+    return device
+
+
 def archive_device(id):
     device=scoped_device(id,False)
     if device.lease_until and device.lease_until>utcnow():

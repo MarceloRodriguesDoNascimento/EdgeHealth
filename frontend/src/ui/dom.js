@@ -47,25 +47,31 @@ export function form(fields, submitText, onSubmit) {
     finally { submit.disabled = false; submit.textContent = original; }
   }); return node;
 }
+let modalCount = 0;
+// Native <dialog> + showModal(): focus moves into the dialog and Esc closes it.
 export function modal(title, content) {
   const previous = document.activeElement;
-  const dialog = el('dialog', { className: 'modal' });
+  const headingId = `modal-title-${++modalCount}`;
+  const dialog = el('dialog', { className: 'modal', 'aria-labelledby': headingId });
   const close = () => dialog.close();
-  dialog.append(el('div', { className: 'modal-heading' }, el('h2', {}, title), button('Fechar', close, 'ghost')));
+  dialog.append(el('div', { className: 'modal-heading' }, el('h2', { id: headingId }, title), button('Fechar', close, 'ghost')));
   dialog.append(typeof content === 'function' ? content(close) : content);
   dialog.addEventListener('close', () => { dialog.remove(); previous?.focus(); }, { once: true });
   document.body.append(dialog); dialog.showModal(); return dialog;
 }
-export function confirmAction(title, message, action) {
+export function confirmAction(title, message, action, confirmText = 'Confirmar', kind = 'danger') {
+  // Initial focus on "Cancelar": Enter right after opening never triggers the action.
   modal(title, close => el('div', {}, el('p', {}, message), el('div', { className: 'actions end' },
-    button('Cancelar', close), button('Confirmar', async event => {
+    button('Cancelar', close, 'secondary', { autofocus: true }), button(confirmText, async event => {
       const target = event.currentTarget;
       target.disabled = true;
       try { await action(); close(); }
       catch (e) { toast(e.message, true); target.disabled = false; }
-    }, 'danger'))));
+    }, kind))));
 }
 export function pageHeader(title, description, actions) {
   return el('header', { className: 'page-heading' }, el('div', {}, el('h1', {}, title), description ? el('p', { className: 'muted' }, description) : null), actions);
 }
 export function params(data) { return new URLSearchParams(Object.entries(data).filter(([,v]) => v !== '' && v !== null && v !== undefined)).toString(); }
+// Brand logo (public/logo.svg). The image carries the accessible name; adjacent text is aria-hidden.
+export const brandLogo = () => el('img', { src: '/logo.svg', alt: 'EdgeHealth', className: 'brand-logo', width: 36, height: 36 });
