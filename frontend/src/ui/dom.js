@@ -25,10 +25,15 @@ export function select(name, items, value = '') {
   const node = el('select', { name }, items.map(([key, text]) => el('option', { value: String(key) }, text)));
   node.value = String(value); return node;
 }
+// On narrow screens each row becomes a card (styles.css): data-label carries the column name,
+// and explicit roles keep the table semantics that display:block would drop.
 export function table(headings, rows) {
-  return el('div', { className: 'table-wrap' }, el('table', {},
-    el('thead', {}, el('tr', {}, headings.map(h => el('th', { scope: 'col' }, h)))),
-    el('tbody', {}, rows.length ? rows.map(row => el('tr', {}, row.map(cell => el('td', {}, cell)))) : el('tr', {}, el('td', { colSpan: headings.length }, empty())))));
+  const isActions = cell => Boolean(cell?.classList?.contains('actions'));
+  return el('div', { className: 'table-wrap' }, el('table', { role: 'table' },
+    el('thead', { role: 'rowgroup' }, el('tr', { role: 'row' }, headings.map(h => el('th', { scope: 'col', role: 'columnheader' }, h)))),
+    el('tbody', { role: 'rowgroup' }, rows.length
+      ? rows.map(row => el('tr', { role: 'row' }, row.map((cell, i) => el('td', { role: 'cell', 'data-label': headings[i], className: isActions(cell) ? 'cell-actions' : null }, cell))))
+      : el('tr', { role: 'row' }, el('td', { role: 'cell', colSpan: headings.length, className: 'cell-empty' }, empty())))));
 }
 export function toast(message, error = false) {
   const area = document.querySelector('#notifications');
@@ -54,7 +59,7 @@ export function modal(title, content) {
   const headingId = `modal-title-${++modalCount}`;
   const dialog = el('dialog', { className: 'modal', 'aria-labelledby': headingId });
   const close = () => dialog.close();
-  dialog.append(el('div', { className: 'modal-heading' }, el('h2', { id: headingId }, title), button('Fechar', close, 'ghost')));
+  dialog.append(el('div', { className: 'modal-heading' }, el('h2', { id: headingId }, title), button('Fechar', close, 'ghost modal-close')));
   dialog.append(typeof content === 'function' ? content(close) : content);
   dialog.addEventListener('close', () => { dialog.remove(); previous?.focus(); }, { once: true });
   document.body.append(dialog); dialog.showModal(); return dialog;

@@ -7,7 +7,7 @@ export async function Falha(id){
     const diag=f.diagnostico;
     const causes=diag?.causas||[];
     const impact=form([
-      label('Usuários afetados (estimativa)',input('usuarios_afetados','Não informado',{type:'number',min:0,max:1000000,step:1,required:true,value:f.impacto?.usuarios_afetados??''})),
+      label('Usuários afetados (estimativa)',input('usuarios_afetados','Não informado',{type:'number',inputMode:'numeric',min:0,max:1000000,step:1,required:true,value:f.impacto?.usuarios_afetados??''})),
       label('Origem da estimativa / observação',el('textarea',{name:'observacao',rows:3,maxLength:500,value:f.impacto?.observacao||'',placeholder:'Ex.: quantidade informada pelo responsável do setor'}))
     ],'Salvar impacto',async data=>{
       await apiFetch(`/falhas/${id}/impacto`,{method:'PUT',body:json({...data,usuarios_afetados:Number(data.usuarios_afetados)})});toast('Impacto atualizado. Severidade recalculada.');await load();

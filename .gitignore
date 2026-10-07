@@ -25,3 +25,5 @@ tests/lab/relatorio*.md
 tests/lab/evidencias/
 tests/lab/resultados/
 tests/lab/screenshots/
+# Responsive audit output (screenshots, ~9 MB): regenerate with node frontend/tests/support/audit.mjs
+tests/responsivo/

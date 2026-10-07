@@ -10,9 +10,9 @@ export function Login(onSuccess, registration = false) {
     el('p', { className: 'auth-footer' }, 'Disponibilidade · Diagnóstico · Histórico'));
   const fields = [];
   if (registration) fields.push(
-    label('Nome da empresa', input('nome_fantasia', 'Nome fantasia', { required: true, maxLength: 150 })),
-    label('CNPJ', input('cnpj', '00.000.000/0000-00', { required: true, maxLength: 18 })),
-    label('Seu nome', input('nome', 'Nome completo', { required: true, maxLength: 100 })));
+    label('Nome da empresa', input('nome_fantasia', 'Nome fantasia', { required: true, maxLength: 150, autoComplete: 'organization' })),
+    label('CNPJ', input('cnpj', '00.000.000/0000-00', { required: true, maxLength: 18, autoComplete: 'off', autocapitalize: 'characters', autocorrect: 'off' })),
+    label('Seu nome', input('nome', 'Nome completo', { required: true, maxLength: 100, autoComplete: 'name' })));
   fields.push(label('E-mail', input('email', 'voce@empresa.com.br', { type: 'email', required: true, autoComplete: 'username' })),
     label('Senha', input('senha', registration ? 'Pelo menos 10 caracteres' : 'Sua senha', { type: 'password', required: true, minLength: registration ? 10 : 1, maxLength: 128, autoComplete: registration ? 'new-password' : 'current-password' })));
   if (registration) fields.push(termsCheckbox());

@@ -25,16 +25,27 @@ function signedIn(data){window.location.hash='dashboard';enter(data);}
 function signedOut(){session=null;cleanup();generation++;app.replaceChildren(Login(signedIn));}
 function shell(){
   const links=[['dashboard','Visão da rede','◫'],['dispositivos','Dispositivos','▤'],['historico','Histórico de falhas','◷'],['relatorios','Relatórios','↓'],...(session.usuario.papel==='ADMIN'?[['coletores','Coletores','⇅'],['empresa','Empresa','▦'],['usuarios','Equipe','◎']]:[])];
+  // Below 850 px the navigation collapses behind a menu button (styles.css); on wider screens the button is hidden.
+  const menuButton=button([el('span',{'aria-hidden':'true'},'☰'),'Menu'],()=>setMenu(menuButton.getAttribute('aria-expanded')!=='true'),'menu-button',{'aria-expanded':'false','aria-controls':'main-nav'});
   app.replaceChildren(el('div',{className:'app-layout'},
-    el('aside',{className:'sidebar'},el('a',{href:'#dashboard',className:'brand'},brandLogo(),el('span',{'aria-hidden':'true'},'EdgeHealth')),
-      el('p',{className:'nav-caption'},'ESPAÇO DA EMPRESA'),el('nav',{'aria-label':'Navegação principal'},links.map(([key,text,icon])=>el('a',{href:`#${key}`,dataset:{route:key}},el('span',{'aria-hidden':'true'},icon),text))),
+    el('aside',{className:'sidebar'},el('div',{className:'sidebar-head'},el('a',{href:'#dashboard',className:'brand'},brandLogo(),el('span',{'aria-hidden':'true'},'EdgeHealth')),menuButton),
+      el('p',{className:'nav-caption'},'ESPAÇO DA EMPRESA'),el('nav',{id:'main-nav','aria-label':'Navegação principal',onclick:e=>{if(e.target.closest('a'))setMenu(false);}},links.map(([key,text,icon])=>el('a',{href:`#${key}`,dataset:{route:key}},el('span',{'aria-hidden':'true'},icon),text))),
       el('div',{className:'sidebar-bottom'},el('span',{className:'small'},'Conectividade com contexto'),el('strong',{},'EdgeHealth / MVP'))),
     el('div',{className:'workspace'},el('header',{className:'topbar'},el('div',{},el('span',{className:'muted small'},'EMPRESA'),el('strong',{id:'company-name'},session.empresa.nome_fantasia)),
       el('div',{className:'actions'},el('span',{className:'user-name'},session.usuario.nome),button('Sair',logout,'ghost'))),el('main',{id:'content',tabIndex:-1}),
       el('footer',{className:'app-footer muted small'},el('a',{href:'/termos.html',target:'_blank',rel:'noopener'},'Termos de Uso'),' · ',el('a',{href:'/privacidade.html',target:'_blank',rel:'noopener'},'Aviso de Privacidade')))))
 }
+function setMenu(open,{restoreFocus=false}={}){
+  const toggle=document.querySelector('.menu-button');if(!toggle)return;
+  toggle.setAttribute('aria-expanded',String(open));
+  toggle.closest('.sidebar').classList.toggle('nav-open',open);
+  if(open)(document.querySelector('#main-nav a.active')||document.querySelector('#main-nav a'))?.focus();
+  else if(restoreFocus)toggle.focus();
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.querySelector('.sidebar.nav-open')&&!document.querySelector('dialog[open]'))setMenu(false,{restoreFocus:true});});
 async function navigate(){
   if(!session)return;
+  setMenu(false);
   cleanup();cleanup=()=>{};
   const own=++generation;
   const page=(window.location.hash||'#dashboard').slice(1);
