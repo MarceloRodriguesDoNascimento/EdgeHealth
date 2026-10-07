@@ -12,7 +12,7 @@ export async function Dispositivos(session) {
     const collectors = (await apiFetch('/coletores').catch(() => [])).filter(c => c.estado !== 'REVOGADO' || c.id === device?.coletor_id);
     modal(device ? 'Editar dispositivo' : 'Cadastrar dispositivo', close => form([
     label('Nome', input('nome', 'Ex.: Switch do escritório', { value: device?.nome || '', required: true, maxLength: 100 })),
-    label('Endereço IP', input('ip', 'IPv4 ou IPv6 do equipamento', { value: device?.ip || '', required: true, maxLength: 45 })),
+    label('Endereço IP', input('ip', 'IPv4 ou IPv6 do equipamento', { value: device?.ip || '', required: true, maxLength: 45, inputMode: 'url', autocapitalize: 'none', autocorrect: 'off', autoComplete: 'off', className: 'mono' })),
     label('Tipo', input('tipo', 'Roteador, switch, servidor…', { value: device?.tipo || '', required: true, maxLength: 50 })),
     label('Localização', input('localizacao', 'Ex.: Sala de TI · Andar 2', { value: device?.localizacao || '', required: true, maxLength: 150 })),
     label('Origem da medição', select('coletor_id', [['', 'Worker local do servidor'], ...collectors.map(c => [c.id, `Coletor: ${c.nome}`])], device?.coletor_id || '')),
