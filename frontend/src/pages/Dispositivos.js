@@ -1,31 +1,41 @@
 import { el, input, label, button, form, table, badge, modal, confirmAction, toast, date, number, pageHeader, select } from '../ui/dom.js';
 import { apiFetch, json } from '../services/api.js';
 
+// A silent collector means "no recent evidence", never "device offline".
+const COLLECTOR_NOTE = { DESATUALIZADO: ' · sem contato recente', NUNCA_CONECTADO: ' · ainda não conectado', REVOGADO: ' · revogado' };
+
 export async function Dispositivos(session) {
   const body = el('div');
   const archived = el('input', { type: 'checkbox', name: 'arquivados' });
   let refresh;
-  const editor = (device = null) => modal(device ? 'Editar dispositivo' : 'Cadastrar dispositivo', close => form([
+  const editor = async (device = null) => {
+    const collectors = (await apiFetch('/coletores').catch(() => [])).filter(c => c.estado !== 'REVOGADO' || c.id === device?.coletor_id);
+    modal(device ? 'Editar dispositivo' : 'Cadastrar dispositivo', close => form([
     label('Nome', input('nome', 'Ex.: Switch do escritório', { value: device?.nome || '', required: true, maxLength: 100 })),
-    label('Endereço IP', input('ip', '192.168.1.1', { value: device?.ip || '', required: true, maxLength: 45 })),
+    label('Endereço IP', input('ip', 'IPv4 ou IPv6 do equipamento', { value: device?.ip || '', required: true, maxLength: 45 })),
     label('Tipo', input('tipo', 'Roteador, switch, servidor…', { value: device?.tipo || '', required: true, maxLength: 50 })),
     label('Localização', input('localizacao', 'Ex.: Sala de TI · Andar 2', { value: device?.localizacao || '', required: true, maxLength: 150 })),
-    el('p', { className: 'muted full' }, `Empresa: ${session.empresa.nome_fantasia}. O estado de conexão é determinado pelo monitoramento.`)
+    label('Origem da medição', select('coletor_id', [['', 'Worker local do servidor'], ...collectors.map(c => [c.id, `Coletor: ${c.nome}`])], device?.coletor_id || '')),
+    el('p', { className: 'muted full' }, `Empresa: ${session.empresa.nome_fantasia}. O estado de conexão é determinado pelo monitoramento. Em hospedagem na nuvem, dispositivos de rede privada precisam de um coletor instalado nessa rede.`)
   ], device ? 'Salvar alterações' : 'Cadastrar dispositivo', async data => {
+    data.coletor_id = data.coletor_id ? Number(data.coletor_id) : null;
     await apiFetch(device ? `/dispositivos/${device.id}` : '/dispositivos', { method: device ? 'PUT' : 'POST', body: json(data) });
     close(); toast(device ? 'Dispositivo atualizado.' : 'Dispositivo cadastrado. Aguardando a primeira coleta.'); await refresh();
   }));
+  };
   refresh = async () => {
     const devices = await apiFetch(`/dispositivos?arquivados=${archived.checked ? 1 : 0}`);
     body.replaceChildren(table(['Dispositivo', 'IP / Tipo', 'Localização', 'Conectividade', 'Última coleta', 'Ações'], devices.map(d => [
       el('div', {}, el('strong', {}, d.nome), d.arquivado_em ? el('small', { className: 'muted' }, 'Arquivado') : null),
       el('div', {}, el('span', { className: 'mono' }, d.ip), el('small', { className: 'muted' }, d.tipo)), d.localizacao,
       el('div', {}, badge(d.status), d.desatualizado && d.ultima_coleta ? el('small', { className: 'warning-text' }, 'Medição desatualizada') : null,
-        d.erro_coleta ? el('small', { className: 'error-text' }, d.erro_coleta) : null),
+        d.erro_coleta ? el('small', { className: 'error-text' }, d.erro_coleta) : null,
+        el('small', { className: d.coletor_estado && d.coletor_estado !== 'ATIVO' ? 'warning-text' : 'muted' },
+          d.coletor ? `Coletor ${d.coletor}${COLLECTOR_NOTE[d.coletor_estado] || ''}` : 'Worker local')),
       el('div', {}, date(d.ultima_coleta), el('small', { className: 'muted' }, `${number(d.latencia_ms, ' ms')} · perda ${number(d.perda_pacotes_pct, '%')}`)),
       el('div', { className: 'actions compact' },
         button('Métricas', () => showMetrics(d), 'ghost'),
-        !d.arquivado_em ? [button('Editar', () => editor(d), 'ghost'),
+        !d.arquivado_em ? [button('Editar', () => editor(d).catch(e => toast(e.message, true)), 'ghost'),
           button('Coletar', async () => { try { const result = await apiFetch(`/dispositivos/${d.id}/coletas`, { method: 'POST', body: '{}' }); toast(result.mensagem); } catch(e) { toast(e.message,true); } }, 'ghost'),
           button('Arquivar', () => confirmAction('Arquivar dispositivo?', `“${d.nome}” deixará de ser monitorado. Métricas e ocorrências serão preservadas.`, async () => {
             await apiFetch(`/dispositivos/${d.id}`, { method: 'DELETE' }); toast('Dispositivo arquivado.'); await refresh();
@@ -33,7 +43,7 @@ export async function Dispositivos(session) {
     ])));
   };
   archived.addEventListener('change', () => refresh().catch(e => toast(e.message,true)));
-  const root = el('section', {}, pageHeader('Dispositivos', 'Inventário e conectividade da sua empresa.', button('Cadastrar dispositivo', () => editor(), 'primary')),
+  const root = el('section', {}, pageHeader('Dispositivos', 'Inventário e conectividade da sua empresa.', button('Cadastrar dispositivo', () => editor().catch(e => toast(e.message, true)), 'primary')),
     el('div', { className: 'toolbar' }, el('label', { className: 'checkbox' }, archived, 'Incluir arquivados'), button('Atualizar', () => refresh().catch(e => toast(e.message,true)))), body);
   await refresh(); return root;
 }
