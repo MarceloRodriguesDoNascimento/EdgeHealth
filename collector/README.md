@@ -75,8 +75,20 @@ Arquivos na pasta de dados, com acesso só para SISTEMA, Administradores e (inst
 
 ```powershell
 .\EdgeHealthColetor.exe --instalar --url https://marcelodomingos.pythonanywhere.com --token-file C:\caminho\coletor.token
-.\EdgeHealthColetor.exe --parar      # ou --iniciar / --desinstalar
+.\EdgeHealthColetor.exe --parar      # ou --iniciar / --desinstalar / --reparar
 ```
+
+### Tarefa falha com 0x80070002 ("arquivo não encontrado")
+
+Acontece quando o coletor foi instalado a partir de um terminal que roda **dentro de outro aplicativo empacotado** (por exemplo, o terminal do app do Claude ou de outro app da Microsoft Store). Nesse caso, o Windows redireciona a pasta `%LOCALAPPDATA%\EdgeHealth` para `%LOCALAPPDATA%\Packages\<aplicativo>\LocalCache\Local\EdgeHealth`. O Agendador de Tarefas roda fora do aplicativo e não encontra o caminho original. Na versão 1.0.0, a tarefa apontava para esse caminho; agora ela aponta sempre para o caminho físico.
+
+Para corrigir uma instalação existente **sem trocar a credencial**, rode no **PowerShell comum** (menu Iniciar → PowerShell, não o terminal de outro aplicativo), com o `EdgeHealthColetor.exe` novo:
+
+```powershell
+.\EdgeHealthColetor.exe --reparar
+```
+
+Ele encerra o coletor antigo, move credencial, fila e logs para o `%LOCALAPPDATA%\EdgeHealth` real, atualiza o `.exe`, re-registra a tarefa e a inicia. Para evitar o problema, instale sempre com dois cliques no Explorador de Arquivos ou num PowerShell aberto pelo menu Iniciar.
 
 ## 3. Instalação manual pelo terminal (Linux e avançado)
 

@@ -13,6 +13,7 @@ administrator, otherwise in %LOCALAPPDATA%\\EdgeHealth. The credential is never 
 """
 import argparse
 import ctypes
+import hashlib
 import json
 import logging
 import logging.handlers
@@ -32,6 +33,7 @@ if not getattr(sys, 'frozen', False):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import edgehealth_collector as core  # noqa: E402  (protocol and loop, unchanged)
 
+# Overridable (--pasta, --nome-tarefa) only to test an isolated install next to a real one.
 APP = 'EdgeHealth'
 TASK = 'EdgeHealth Coletor'
 EXE = 'EdgeHealthColetor.exe'
@@ -69,6 +71,57 @@ def scope_dir(scope):
     return Path(base) / APP
 
 
+# A program started from a terminal inside an MSIX-packaged app (e.g. the Claude desktop app)
+# inherits that package: its writes to %LOCALAPPDATA% are silently redirected to
+# %LOCALAPPDATA%/Packages/<family>/LocalCache/Local. Task Scheduler runs outside the package, so
+# a task pointing at the path the installer *saw* fails with 0x80070002 (file not found).
+def packaged():
+    length = ctypes.c_uint(0)
+    try:
+        return ctypes.windll.kernel32.GetCurrentPackageFullName(ctypes.byref(length), None) == 122  # buffer too small
+    except (AttributeError, OSError):
+        return False
+
+
+def physical(path):
+    """The real on-disk path of an existing folder, resolving package redirection."""
+    k = ctypes.windll.kernel32
+    k.CreateFileW.restype = ctypes.c_void_p
+    handle = k.CreateFileW(str(path), 0, 7, None, 3, 0x02000000, None)  # OPEN_EXISTING, BACKUP_SEMANTICS (folders)
+    if handle in (None, ctypes.c_void_p(-1).value):
+        return Path(path)
+    try:
+        buf = ctypes.create_unicode_buffer(1024)
+        n = k.GetFinalPathNameByHandleW(ctypes.c_void_p(handle), buf, 1024, 0)
+    finally:
+        k.CloseHandle(ctypes.c_void_p(handle))
+    if not n or n >= 1024:
+        return Path(path)
+    return Path(strip_long_prefix(buf.value))
+
+
+def strip_long_prefix(final):
+    """GetFinalPathNameByHandle returns \\\\?\\C:\\... or \\\\?\\UNC\\server\\share\\..."""
+    for prefix, replacement in ((r'\\?\UNC' + '\\', r'\\'), (r'\\?' + '\\', '')):
+        if final.startswith(prefix):
+            return replacement + final[len(prefix):]
+    return final
+
+
+def virtualized(path):
+    parts = [x.lower() for x in Path(path).parts]
+    return 'packages' in parts and 'localcache' in parts
+
+
+def virtualized_copies():
+    """User installs made from a packaged terminal, seen from outside the package."""
+    root = Path(os.environ['LOCALAPPDATA']) / 'Packages'
+    try:
+        return sorted(d for d in root.glob(f'*/LocalCache/Local/{APP}') if (d / 'config.json').exists())
+    except OSError:
+        return []
+
+
 def installed():
     """(scope, directory) of an existing installation, machine-wide first."""
     for scope in ('maquina', 'usuario'):
@@ -78,7 +131,8 @@ def installed():
                 return scope, d
         except PermissionError:  # machine install opened without elevation: the folder is restricted
             return scope, d
-    return None, None
+    copies = virtualized_copies()
+    return ('usuario', copies[0]) if copies else (None, None)
 
 
 def read_config(d):
@@ -102,7 +156,8 @@ def restrict(d, scope):
     grants = [f'*{SYSTEM_SID}:(OI)(CI)F', f'*{ADMINS_SID}:(OI)(CI)F']
     if scope == 'usuario':
         grants.append(f'*{current_user_sid()}:(OI)(CI)F')
-    run(['icacls', str(d), '/inheritance:r', *sum((['/grant:r', g] for g in grants), [])])
+    # External tools may run outside an app package: always hand them the physical path.
+    run(['icacls', str(physical(d)), '/inheritance:r', *sum((['/grant:r', g] for g in grants), [])])
 
 
 # --- Connection test -------------------------------------------------------------------------
@@ -173,12 +228,12 @@ def service_command(d):
 
 
 def register_task(scope, d):
-    command, arguments = service_command(d)
+    command, arguments = service_command(physical(d))  # the path Task Scheduler will actually find
     xml = task_xml(scope, command, arguments, None if scope == 'maquina' else current_user_sid())
     with tempfile.NamedTemporaryFile('w', suffix='.xml', delete=False, encoding='utf-16') as f:
         f.write(xml)
     try:
-        run(['schtasks', '/Create', '/TN', TASK, '/XML', f.name, '/F'])
+        run(['schtasks', '/Create', '/TN', TASK, '/XML', str(physical(f.name)), '/F'])  # %TEMP% may be redirected too
     finally:
         os.unlink(f.name)
 
@@ -236,7 +291,43 @@ def install(url, token, scope):
                 time.sleep(1)
     register_task(scope, d)
     start()
-    return d
+    return physical(d)
+
+
+def repair():
+    """Re-registers the task of the existing installation, keeping credential, queue and logs.
+    Run outside a packaged terminal, an installation that was redirected into an app's
+    LocalCache is first moved to the real %LOCALAPPDATA%, so it no longer depends on that app."""
+    scope, d = installed()
+    if not d:
+        raise RuntimeError('Nenhuma instalação do coletor encontrada.')
+    source = physical(d)
+    end_service()  # also the copy started by hand: it records its PID in the same folder
+    target = source
+    if scope == 'usuario' and virtualized(source) and not packaged():
+        target = scope_dir('usuario')
+        shutil.copytree(source, target, dirs_exist_ok=True, ignore=shutil.ignore_patterns('coletor.pid', EXE))
+        restrict(target, 'usuario')
+    if getattr(sys, 'frozen', False) and Path(sys.executable).resolve() != (target / EXE).resolve():
+        for attempt in range(10):  # this (fixed) build replaces the installed copy
+            try:
+                shutil.copy2(sys.executable, target / EXE)
+                break
+            except PermissionError:
+                if attempt == 9:
+                    raise
+                time.sleep(1)
+    elif not (target / EXE).exists() and (source / EXE).exists():
+        shutil.copy2(source / EXE, target / EXE)
+    register_task(scope, target)
+    start()
+    if target != source:
+        for _ in range(5):
+            shutil.rmtree(source, ignore_errors=True)
+            if not source.exists():
+                break
+            time.sleep(1)
+    return physical(target)
 
 
 def stop_running_copy():
@@ -264,8 +355,15 @@ def uninstall():
 
 
 # --- Service mode ----------------------------------------------------------------------------
-def single_instance(scope):
-    name = ('Global\\' if scope == 'maquina' else 'Local\\') + 'EdgeHealthColetor'
+def instance_name(scope, d):
+    """One collector per installation: the lock is named after the physical data folder, so a copy
+    started by hand from a packaged terminal and the scheduled task still exclude each other."""
+    digest = hashlib.sha256(os.path.normcase(str(physical(d))).encode()).hexdigest()[:16]
+    return ('Global\\' if scope == 'maquina' else 'Local\\') + 'EdgeHealthColetor-' + digest
+
+
+def single_instance(scope, d):
+    name = instance_name(scope, d)
     handle = ctypes.windll.kernel32.CreateMutexW(None, False, name)
     return handle if ctypes.windll.kernel32.GetLastError() != 183 else None  # 183: already exists
 
@@ -275,7 +373,7 @@ def service(d):
     cfg = read_config(d)
     handler = logging.handlers.RotatingFileHandler(d / 'logs' / 'coletor.log', maxBytes=1_000_000, backupCount=5, encoding='utf-8')
     logging.basicConfig(level=logging.INFO, handlers=[handler], format='%(asctime)s %(levelname)s %(message)s')
-    if not single_instance(cfg.get('escopo', 'maquina')):
+    if not single_instance(cfg.get('escopo', 'maquina'), d):
         log.info('Outra instância do coletor já está em execução; encerrando esta.')
         return 0
     (d / 'coletor.pid').write_text(str(os.getpid()), encoding='ascii')
@@ -431,8 +529,13 @@ def main(argv=None):
     p.add_argument('--parar', action='store_true')
     p.add_argument('--iniciar', action='store_true')
     p.add_argument('--desinstalar', action='store_true')
+    p.add_argument('--reparar', action='store_true', help='re-registra a tarefa da instalação existente, sem trocar a credencial')
+    p.add_argument('--pasta', help=argparse.SUPPRESS)        # test isolation: data folder name
+    p.add_argument('--nome-tarefa', help=argparse.SUPPRESS)  # test isolation: scheduled task name
     args = p.parse_args(argv)
-    if args.instalar or args.parar or args.iniciar or args.desinstalar:
+    global APP, TASK
+    APP, TASK = args.pasta or APP, args.nome_tarefa or TASK
+    if args.instalar or args.parar or args.iniciar or args.desinstalar or args.reparar:
         attach_console()
     if args.servico:
         d = args.dados or installed()[1]
@@ -449,6 +552,9 @@ def main(argv=None):
         stop(); return 0
     if args.iniciar:
         start(); return 0
+    if args.reparar:
+        print(f'Tarefa re-registrada; dados em {repair()}')
+        return 0
     if args.desinstalar:
         d = uninstall(); print(f'Removido: {d or "nada instalado"}'); return 0
     gui()
