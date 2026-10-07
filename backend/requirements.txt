@@ -5,3 +5,4 @@ Flask-Migrate==4.1.0
 python-dotenv==1.2.3
 icmplib==3.0.4
 waitress==3.0.2
+tzdata==2026.5

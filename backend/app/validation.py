@@ -1,6 +1,7 @@
 import ipaddress
 import re
 from datetime import datetime, timezone, timedelta
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from flask import request
 from werkzeug.exceptions import BadRequest
 
@@ -68,6 +69,50 @@ def integer(value, field, low=0, high=1000000):
     if isinstance(value, bool) or not isinstance(value, int) or not low <= value <= high:
         raise BadRequest(f'{field}: informe um inteiro entre {low} e {high}.')
     return value
+
+
+def decimal_value(value, field, low=Decimal('0'), high=Decimal('1000000000'), places=2):
+    """Exact decimal from a JSON number or text ("3000.50" or "3000,50"); never stored as float."""
+    if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+        raise BadRequest(f'{field}: informe um valor numérico.')
+    try:
+        # str() first: a JSON float such as 0.1 becomes Decimal('0.1'), not its binary expansion.
+        number = Decimal(str(value).strip().replace(',', '.'))
+    except InvalidOperation:
+        raise BadRequest(f'{field}: informe um valor numérico.') from None
+    if not number.is_finite():
+        raise BadRequest(f'{field}: informe um valor numérico.')
+    if number < low:
+        raise BadRequest(f'{field}: o valor não pode ser menor que {low}.' if low else f'{field}: o valor não pode ser negativo.')
+    if number > high:
+        raise BadRequest(f'{field}: o valor não pode passar de {high}.')
+    return number.quantize(Decimal(1).scaleb(-places), rounding=ROUND_HALF_UP)
+
+
+def optional(value, parse, *args, **kwargs):
+    return None if value is None or value == '' else parse(value, *args, **kwargs)
+
+
+def clock(value, field):
+    if not isinstance(value, str) or not re.fullmatch(r'([01]\d|2[0-3]):[0-5]\d', value):
+        raise BadRequest(f'{field}: use o formato HH:MM.')
+    return value
+
+
+def weekdays(value):
+    """ISO weekdays (1 = Monday ... 7 = Sunday) stored as a digit string, e.g. "12345"."""
+    if not isinstance(value, list) or not value or any(isinstance(d, bool) or d not in range(1, 8) for d in value):
+        raise BadRequest('Expediente: escolha ao menos um dia da semana (1 = segunda a 7 = domingo).')
+    return ''.join(str(d) for d in sorted(set(value)))
+
+
+def timezone_name(value):
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+    try:
+        ZoneInfo(string(value, 'Fuso horário', 50))
+    except (ZoneInfoNotFoundError, ValueError):
+        raise BadRequest('Fuso horário inválido. Ex.: America/Sao_Paulo.') from None
+    return value.strip()
 
 
 def query_int(name, default=None, low=1, high=2147483647):

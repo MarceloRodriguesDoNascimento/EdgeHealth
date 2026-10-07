@@ -101,6 +101,14 @@ test('interface completa usa a API HTTP e SQLite migrado, sem respostas HTTP sim
     mount(await Empresa(session));
     await submit({nome_fantasia:'Empresa atualizada',telefone:'31999999999'});
     assert.equal((await apiFetch('/empresa')).nome_fantasia,'Empresa atualizada');
+    // Costs: live cost-per-hour preview, then saved as exact decimals (all day, every day: deterministic tests).
+    const costs=document.querySelector('#custos');
+    const salary=costs.querySelector('[name=salario_medio]');salary.value='3.000,00';salary.dispatchEvent(new Event('input'));
+    assert.match(costs.querySelector('.cost-preview').textContent,/Custo por hora estimado: R\$\s23,18 \(3\.000 × 1,7 ÷ 220\)/);
+    costs.querySelectorAll('[name=dias]').forEach(box=>{box.checked=true;});
+    await submit({salario_medio:'3.000,00',total_funcionarios:'40',inicio:'00:00',fim:'23:59'},costs);
+    const saved=(await apiFetch('/empresa')).custos;
+    assert.equal(saved.custo_hora,'23.18');assert.equal(saved.salario_medio,'3000.00');assert.deepEqual(saved.expediente.dias,[1,2,3,4,5,6,7]);
   });
 
   await t.test('criação, edição e desativação de usuário da equipe',async()=>{
@@ -128,6 +136,23 @@ test('interface completa usa a API HTTP e SQLite migrado, sem respostas HTTP sim
     button('Coletar').click();await until(()=>requests.some(r=>r.path.endsWith('/coletas')&&r.status===202),'Coleta não solicitada');
     assert.equal((await apiFetch('/metricas')).total,0);
     await collect(4,2.5);assert.equal((await apiFetch(`/dispositivos/${deviceId}`)).status,'ONLINE');
+    // "Impacto no negócio" follows the type until edited: a printer is 10 people, 30% (custom).
+    button('Cadastrar dispositivo').click();await until(()=>document.querySelector('dialog form'),'Formulário não abriu');
+    const dialog=document.querySelector('dialog'),tipo=dialog.querySelector('[name=tipo]');
+    tipo.value='Impressora';tipo.dispatchEvent(new Event('input'));
+    await until(()=>dialog.querySelector('[name=usuarios_dependentes]').value==='10','Padrão do tipo não aplicado',3000);
+    assert.equal(dialog.querySelector('[name=perda_opcao]:checked').value,'custom');assert.equal(dialog.querySelector('[name=perda_custom]').value,'30');
+    tipo.value='Máquina de cartão';tipo.dispatchEvent(new Event('input'));
+    await until(()=>dialog.querySelector('[name=usuarios_dependentes]').value==='1'&&/receita direta/.test(dialog.textContent),'PDV não sugeriu receita',3000);
+    assert.equal(dialog.querySelector('[name=perda_opcao]:checked').value,'100');
+    const people=dialog.querySelector('[name=usuarios_dependentes]');people.value='3';people.dispatchEvent(new Event('input'));
+    tipo.value='Roteador';tipo.dispatchEvent(new Event('input'));await pause(450);
+    assert.equal(people.value,'3');  // edited by the person: the type no longer overwrites it
+    dialog.querySelector('[value="10"][name=perda_opcao]').click();
+    await submit({nome:'Caixa da loja',ip:'127.0.0.9',localizacao:'Loja',receita_hora_dependente:'1.234,50'},dialog);
+    const pos=(await apiFetch('/dispositivos')).find(d=>d.nome==='Caixa da loja');
+    assert.deepEqual([pos.usuarios_dependentes,pos.perda_produtividade_pct,pos.receita_hora_dependente],[3,10,'1234.50']);
+    await apiFetch(`/dispositivos/${pos.id}`,{method:'DELETE'});
   });
 
   await t.test('falha única, severidade, diagnóstico, causas e impacto na tela',async()=>{
@@ -137,9 +162,14 @@ test('interface completa usa a API HTTP e SQLite migrado, sem respostas HTTP sim
     mount(await Falha(failureId));
     assert.match(document.querySelector('#app').textContent,/CONGESTIONAMENTO/);
     assert.match(document.querySelector('#app').textContent,/Verificar tráfego e interfaces/);
-    await submit({usuarios_afetados:'60',observacao:'Informação do responsável de TI'});
+    await submit({usuarios_afetados:'60',custos_diretos:'250,00',observacao:'Informação do responsável de TI'});
     assert.equal((await apiFetch(`/falhas/${failureId}`)).severidade,'CRITICA');
     assert.match(document.querySelector('#app').textContent,/Estimativa informada pela equipe/);
+    // Loss estimate: the value and the open calculation, with the disclaimer.
+    const loss=document.querySelector('.loss-panel').textContent,estimate=(await apiFetch(`/falhas/${failureId}`)).prejuizo;
+    assert.match(loss,/60 pessoas × R\$ 23,18\/h × 50% × [\d,]+ h de expediente \+ R\$ 250,00 de custos diretos/);
+    assert.match(loss,/Estimativa baseada nos custos informados pela empresa/);
+    assert.equal(estimate.detalhe.custos_diretos,'250.00');assert.equal(estimate.detalhe.pessoas,60);
   });
 
   await t.test('dashboard apresenta métricas e gráficos com dados persistidos',async()=>{
@@ -147,6 +177,8 @@ test('interface completa usa a API HTTP e SQLite migrado, sem respostas HTTP sim
     await until(()=>document.querySelectorAll('.stat strong').length===5,'Dashboard não desenhou');
     assert.deepEqual([...document.querySelectorAll('.stat strong')].map(n=>n.textContent),['1','0','1','0','1']);
     const canvas=document.querySelectorAll('canvas');assert.equal(canvas.length,2);
+    assert.match(document.querySelector('.cost-summary').textContent,/R\$\s[\d.]+,\d{2}/);
+    assert.match(document.querySelector('.cost-summary').textContent,/Servidor atualizado/);
     assert.deepEqual(Chart.getChart(canvas[0]).data.datasets[0].data,[2.5,220,240]);
     assert.deepEqual(Chart.getChart(canvas[1]).data.datasets[0].data,[0,25,25]);
     dispose();dispose=()=>{};

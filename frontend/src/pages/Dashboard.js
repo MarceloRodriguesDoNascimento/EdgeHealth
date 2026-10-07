@@ -1,5 +1,5 @@
 import Chart from 'chart.js/auto';
-import { el,label,input,select,button,pageHeader,badge,table,date,number,empty,params,toast } from '../ui/dom.js';
+import { el,label,input,select,button,pageHeader,badge,table,date,number,empty,params,toast,brl } from '../ui/dom.js';
 import { apiFetch } from '../services/api.js';
 import { collectorBadge } from './Coletores.js';
 
@@ -7,7 +7,7 @@ export async function Dashboard(onDispose) {
   const initial=await apiFetch('/dashboard');
   const device=select('dispositivo_id',[['','Selecione um dispositivo'],...initial.dispositivos.map(d=>[d.id,d.nome])],initial.dispositivo_id||'');
   const start=input('inicio','',{type:'date'}),end=input('fim','',{type:'date'});
-  const cards=el('div',{className:'stats-grid'}),severity=el('div',{className:'severity-list'}),collectors=el('div',{className:'severity-list'}),recent=el('div'),time=el('span',{className:'muted small'}),sampleInfo=el('p',{className:'muted small'});
+  const cards=el('div',{className:'stats-grid'}),severity=el('div',{className:'severity-list'}),collectors=el('div',{className:'severity-list'}),recent=el('div'),costs=el('div',{className:'cost-summary'}),time=el('span',{className:'muted small'}),sampleInfo=el('p',{className:'muted small'});
   const latency=el('canvas',{'aria-label':'Histórico de latência',role:'img'}),loss=el('canvas',{'aria-label':'Histórico de perda de pacotes',role:'img'});
   let charts=[]; let stopped=false; let requestId=0;
   // Fewer x-axis labels on narrow charts (about one per 90 px); recalculated on resize and rotation.
@@ -18,6 +18,7 @@ export async function Dashboard(onDispose) {
     time.textContent=`Atualizado em ${date(data.atualizado_em)}`;
     sampleInfo.textContent=`${data.serie.length} de ${data.serie_total} amostras do dispositivo no período; no máximo as 500 mais recentes. ${data.indicadores.sem_coleta} sem coleta e ${data.indicadores.desatualizados} com dados ausentes ou desatualizados.`;
     collectors.replaceChildren(...(data.coletores.length?data.coletores.map(c=>el('div',{className:'severity-row'},el('span',{},c.nome),collectorBadge(c.estado))):[el('p',{className:'muted small'},'Nenhum coletor remoto. Os dispositivos são medidos pelo worker local.')]));
+    costs.replaceChildren(...costSummary(data.custos));
     severity.replaceChildren(...['BAIXA','MEDIA','ALTA','CRITICA'].map(level=>el('div',{className:'severity-row'},badge(level),el('strong',{},data.severidades[level]||0))));
     charts.forEach(c=>c.destroy());charts=[];
     for(const [canvas,key,title,color,max] of [[latency,'latencia_ms','Latência (ms)','#087f8c',undefined],[loss,'perda_pacotes_pct','Perda (%)','#365cdb',100]]){
@@ -33,7 +34,7 @@ export async function Dashboard(onDispose) {
     el('div',{className:'filters'},label('Dispositivo',device),label('Início (UTC)',start),label('Fim (UTC)',end),button('Aplicar',refresh,'primary')),
     sampleInfo,el('div',{className:'chart-grid'},el('div',{className:'panel'},el('h3',{},'Latência'),el('div',{className:'chart-box'},latency)),el('div',{className:'panel'},el('h3',{},'Perda de pacotes'),el('div',{className:'chart-box'},loss))),
     el('div',{className:'bottom-grid'},el('div',{},el('div',{className:'section-heading'},el('h2',{},'Ocorrências recentes'),el('a',{href:'#historico',className:'text-link'},'Ver histórico')),recent),
-      el('aside',{},el('div',{className:'panel'},el('h3',{},'Severidade das falhas abertas'),severity),
+      el('aside',{},el('div',{className:'panel'},el('h3',{},'Custo estimado das falhas (30 dias)'),costs),el('div',{className:'panel'},el('h3',{},'Severidade das falhas abertas'),severity),
         el('div',{className:'panel'},el('h3',{},'Coletores'),collectors,el('p',{className:'muted small'},'Coletor sem contato recente indica falta de dados, não queda dos dispositivos.')))));
   // The canvas must be attached before its responsive chart is initialized.
   setTimeout(()=>{if(!stopped&&requestId===0)draw(initial);},0);
@@ -41,4 +42,13 @@ export async function Dashboard(onDispose) {
   window.addEventListener('resize',onResize);
   onDispose(()=>{stopped=true;clearInterval(timer);window.removeEventListener('resize',onResize);charts.forEach(c=>c.destroy());});
   return root;
+}
+
+// Shared outages are already de-duplicated by the API; the ranking adds each device's own estimate.
+export function costSummary(c){
+  if(!c||!c.configurado)return [el('p',{className:'muted small'},c?.mensagem||'Configure os custos da empresa para ver a estimativa.'),el('a',{href:'#empresa',className:'text-link'},'Configurar custos')];
+  return [el('p',{className:'money-hero'},brl(c.total)),
+    el('p',{className:'muted small'},`${c.falhas} ocorrência${c.falhas===1?'':'s'} iniciada${c.falhas===1?'':'s'} nos últimos ${c.dias} dias${c.em_andamento?', incluindo falhas em andamento (valor parcial)':''}.`),
+    c.top_dispositivos.length?el('ol',{className:'cost-top'},c.top_dispositivos.map(d=>el('li',{},el('span',{},d.nome),el('strong',{},brl(d.valor))))):null,
+    el('p',{className:'muted small'},c.aviso)];
 }

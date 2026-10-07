@@ -1,3 +1,4 @@
+from decimal import Decimal
 from flask import current_app, g
 from sqlalchemy import select, func
 from werkzeug.exceptions import BadRequest, Conflict, NotFound
@@ -98,6 +99,7 @@ def save_device(data,id=None):
             device.coletor_id=collector_id
             device.erro_coleta=None
             device.proxima_coleta=utcnow()
+    business_impact(device,data,creating=not id)
     if id and old_ip!=device.ip:
         current=db.session.scalar(select(Falha).where(Falha.dispositivo_id==id,Falha.estado=='ABERTA'))
         if current: raise Conflict('Encerre a ocorrência por recuperação ou arquive o dispositivo antes de alterar o IP.')
@@ -109,6 +111,51 @@ def save_device(data,id=None):
     if not id: db.session.add(device)
     db.session.commit()
     return device
+
+
+def business_impact(device,data,creating):
+    """People, productivity loss and direct revenue that depend on the device. A new device without
+    these fields gets the defaults for its type (editable); explicit null clears a value."""
+    if 'usuarios_dependentes' in data:
+        device.usuarios_dependentes=v.optional(data['usuarios_dependentes'],v.integer,'Pessoas que usam o aparelho')
+    if 'perda_produtividade_pct' in data:
+        device.perda_produtividade_pct=v.optional(data['perda_produtividade_pct'],v.integer,'Perda de produtividade (%)',0,100)
+    if 'receita_hora_dependente' in data:
+        device.receita_hora_dependente=v.optional(data['receita_hora_dependente'],v.decimal_value,'Receita por hora')
+    if creating:
+        from .costs import defaults
+        default=defaults(device.tipo,db.session.get(Empresa,device.empresa_id))
+        if 'usuarios_dependentes' not in data: device.usuarios_dependentes=default['usuarios']
+        if 'perda_produtividade_pct' not in data: device.perda_produtividade_pct=default['perda_pct']
+
+
+def update_company_costs(data):
+    company=db.session.get(Empresa,g.user.empresa_id)
+    if 'salario_medio' in data: company.salario_medio=v.optional(data['salario_medio'],v.decimal_value,'Salário médio')
+    if 'fator_encargos' in data: company.fator_encargos=v.decimal_value(data['fator_encargos'],'Fator de encargos',Decimal('1'),Decimal('5'))
+    if 'horas_mes' in data: company.horas_mes=v.integer(data['horas_mes'],'Horas por mês',1,744)
+    if 'total_funcionarios' in data: company.total_funcionarios=v.optional(data['total_funcionarios'],v.integer,'Total de funcionários')
+    if 'expediente' in data:
+        shift=data['expediente']
+        if not isinstance(shift,dict) or set(shift)-{'dias','inicio','fim'}:
+            raise BadRequest('Expediente: informe dias, inicio e fim.')
+        days=v.weekdays(shift.get('dias',[int(d) for d in company.expediente_dias]))
+        start=v.clock(shift.get('inicio',company.expediente_inicio),'Início do expediente')
+        end=v.clock(shift.get('fim',company.expediente_fim),'Fim do expediente')
+        if start>=end: raise BadRequest('O fim do expediente deve ser depois do início.')
+        company.expediente_dias,company.expediente_inicio,company.expediente_fim=days,start,end
+    if 'fuso' in data: company.fuso=v.timezone_name(data['fuso'])
+    company.assistente_custos='CONCLUIDO'
+    db.session.commit()
+    return company
+
+
+def skip_cost_assistant():
+    company=db.session.get(Empresa,g.user.empresa_id)
+    if company.assistente_custos is None:
+        company.assistente_custos='PULADO'
+        db.session.commit()
+    return company
 
 
 def restore_device(id):

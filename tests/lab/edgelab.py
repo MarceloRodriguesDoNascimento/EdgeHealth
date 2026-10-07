@@ -29,6 +29,7 @@ import sys
 import time
 import traceback
 import urllib.error
+import urllib.parse
 import urllib.request
 import zipfile
 from datetime import datetime, timedelta, timezone
@@ -341,6 +342,28 @@ def falha(args):
     if args.acao not in mapping:
         raise SystemExit(f'Ação inválida. Use: {", ".join([*mapping, "coletor-iniciar"])}')
     print(lab(*mapping[args.acao], *args.args).strip())
+
+
+LAB_COSTS = {'salario_medio': '3000', 'total_funcionarios': 40, 'expediente': {'dias': [1, 2, 3, 4, 5], 'inicio': '08:00', 'fim': '18:00'}}
+SECTOR_PEOPLE = {'switch2': 12, 'ap': 12}  # Switch / Access Point: "people of the sector" is a question
+
+
+def custos(_=None):
+    """Demo data for the loss estimate: company costs and each device's impact from its type defaults."""
+    c = login()
+    company = c.put('/empresa/custos', LAB_COSTS)['custos']
+    say(f'Custos da empresa: custo por hora {company["custo_hora"]} (salário {company["salario_medio"]}, '
+        f'{company["total_funcionarios"]} funcionários, seg–sex {company["expediente"]["inicio"]}–{company["expediente"]["fim"]}).')
+    for key, d in devices_by_key(c).items():
+        if not d:
+            continue
+        default = c.get('/dispositivos/impacto-padrao?' + urllib.parse.urlencode({'tipo': d['tipo']}))
+        people = SECTOR_PEOPLE.get(key, default['usuarios'])
+        updated = c.put(f'/dispositivos/{d["id"]}', {'usuarios_dependentes': people, 'perda_produtividade_pct': default['perda_pct']})
+        say(f'{d["nome"]:<30} {default["rotulo"]:<40} {updated["usuarios_dependentes"]!s:>3} pessoas · {updated["perda_produtividade_pct"]}%')
+    summary = c.get('/dashboard')['custos']
+    say(f'Dashboard (30 dias): {summary.get("total")} em {summary.get("falhas")} ocorrências; top: '
+        + ', '.join(f'{t["nome"]} {t["valor"]}' for t in summary.get('top_dispositivos', [])))
 
 
 def log(_=None):
@@ -823,7 +846,7 @@ def noturno(_):
 def main():
     p = argparse.ArgumentParser(description='Laboratório de rede do EdgeHealth')
     sub = p.add_subparsers(dest='cmd', required=True)
-    for name, fn in [('noturno', noturno), ('preparar', preparar), ('subir', subir), ('descer', descer),
+    for name, fn in [('noturno', noturno), ('preparar', preparar), ('subir', subir), ('descer', descer), ('custos', custos),
                      ('status', status), ('log', log)]:
         sub.add_parser(name).set_defaults(fn=fn)
     f = sub.add_parser('falha', help='offline D | latencia D MS | perda D PCT | degradar D MS PCT | '
