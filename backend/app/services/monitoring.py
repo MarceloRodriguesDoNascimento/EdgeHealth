@@ -67,9 +67,32 @@ def classify(device,result):
     return 'ONLINE'
 
 
-def record_result(device,result,observed_at=None):
-    """Caller owns transaction and device lease. No network I/O in this function."""
+def instant_status(result):
+    """Stateless classification of a single sample, without confirmation counters."""
+    cfg=current_app.config
+    if result.received==0:
+        return 'OFFLINE'
+    if result.loss>=cfg['LOSS_LIMIT_PCT'] or result.latency_ms>=cfg['LATENCY_LIMIT_MS']:
+        return 'INSTAVEL'
+    return 'ONLINE'
+
+
+def record_result(device,result,observed_at=None,origin=None):
+    """Caller owns transaction and device lease. No network I/O in this function.
+
+    origin: optional dict(coletor_id, amostra_uid, recebida_em) for remotely ingested samples.
+    """
     now=observed_at or utcnow()
+    origin=origin or {}
+    if device.ultima_coleta and now<=device.ultima_coleta:
+        # A delayed sample is preserved as history but cannot rewind the state machine,
+        # reopen a closed incident or count towards confirmations.
+        metric=Metrica(dispositivo_id=device.id,coletada_em=now,respondeu=bool(result.received),
+            latencia_ms=result.latency_ms,pacotes_enviados=result.sent,pacotes_recebidos=result.received,
+            perda_pacotes_pct=result.loss,status=instant_status(result),fora_de_ordem=True,**origin)
+        db.session.add(metric)
+        db.session.flush()
+        return metric
     device.status=classify(device,result)
     device.ultima_coleta=now
     device.latencia_ms=result.latency_ms
@@ -77,7 +100,7 @@ def record_result(device,result,observed_at=None):
     device.erro_coleta=None
     metric=Metrica(dispositivo_id=device.id,coletada_em=now,respondeu=bool(result.received),
         latencia_ms=result.latency_ms,pacotes_enviados=result.sent,pacotes_recebidos=result.received,
-        perda_pacotes_pct=result.loss,status=device.status)
+        perda_pacotes_pct=result.loss,status=device.status,**origin)
     db.session.add(metric)
     current=db.session.scalar(select(Falha).where(Falha.dispositivo_id==device.id,Falha.estado=='ABERTA'))
     if device.status!='ONLINE':
@@ -116,17 +139,24 @@ def validate_monitor_config(cfg):
         raise ValueError('Limites de classificação inválidos.')
 
 
+def claim_device(device_id,*conditions):
+    """Atomically take the exclusive per-device lease shared by worker and ingestion."""
+    now=utcnow()
+    owner=secrets.token_hex(16)
+    claimed=db.session.execute(update(Dispositivo).where(Dispositivo.id==device_id,
+        Dispositivo.arquivado_em.is_(None),*conditions,
+        or_(Dispositivo.lease_until.is_(None),Dispositivo.lease_until<now)).values(
+            lease_owner=owner,lease_until=now+timedelta(seconds=current_app.config['MONITOR_LEASE_SECONDS'])))
+    db.session.commit()
+    return owner if claimed.rowcount else None
+
+
 def collect_device(app,device_id,probe=None):
     with app.app_context():
         validate_monitor_config(app.config)
-        now=utcnow()
-        owner=secrets.token_hex(16)
-        claimed=db.session.execute(update(Dispositivo).where(Dispositivo.id==device_id,
-            Dispositivo.arquivado_em.is_(None),Dispositivo.proxima_coleta<=now,
-            or_(Dispositivo.lease_until.is_(None),Dispositivo.lease_until<now)).values(
-                lease_owner=owner,lease_until=now+timedelta(seconds=app.config['MONITOR_LEASE_SECONDS'])))
-        db.session.commit()
-        if not claimed.rowcount:
+        # Devices assigned to a remote collector are never probed by the local worker.
+        owner=claim_device(device_id,Dispositivo.coletor_id.is_(None),Dispositivo.proxima_coleta<=utcnow())
+        if not owner:
             return False
         device=db.session.get(Dispositivo,device_id)
         address=device.ip
@@ -159,6 +189,6 @@ def run_cycle(app,probe=None):
     with app.app_context():
         validate_monitor_config(app.config)
         ids=list(db.session.scalars(select(Dispositivo.id).where(Dispositivo.arquivado_em.is_(None),
-            Dispositivo.proxima_coleta<=utcnow()).order_by(Dispositivo.proxima_coleta).limit(500)))
+            Dispositivo.coletor_id.is_(None),Dispositivo.proxima_coleta<=utcnow()).order_by(Dispositivo.proxima_coleta).limit(500)))
     with ThreadPoolExecutor(max_workers=app.config['MONITOR_WORKERS']) as pool:
         return sum(pool.map(lambda id: collect_device(app,id,probe),ids))

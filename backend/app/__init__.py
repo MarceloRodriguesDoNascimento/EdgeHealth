@@ -12,6 +12,11 @@ def create_app(config=None):
     if config:
         app.config.update(config)
     Path(app.instance_path).mkdir(parents=True, exist_ok=True)
+    if app.config['TRUST_PROXY']:
+        # Behind exactly N trusted reverse proxies (TLS termination): real client IP and scheme.
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        hops = app.config['TRUST_PROXY']
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=hops, x_proto=hops, x_host=hops)
     db.init_app(app)
     from . import models
     migrate.init_app(app, db, render_as_batch=True)
@@ -44,6 +49,8 @@ def create_app(config=None):
         response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
         if response.mimetype == 'application/json':
             response.headers['Cache-Control'] = 'no-store'
+        if app.config['SESSION_COOKIE_SECURE']:
+            response.headers['Strict-Transport-Security'] = 'max-age=31536000'
         return response
 
     @app.get('/')
@@ -54,4 +61,6 @@ def create_app(config=None):
         return send_from_directory(app.config['FRONTEND_DIST'], path)
 
     logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s %(message)s')
+    if not app.config['SESSION_COOKIE_SECURE'] and not app.testing:
+        app.logger.warning('COOKIE_SECURE=false: use somente em HTTP local. Em hospedagem com HTTPS defina COOKIE_SECURE=true.')
     return app

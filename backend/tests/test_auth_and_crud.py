@@ -33,7 +33,13 @@ def test_company_and_user_form_contract(signed,app):
     response=signed.post('/api/usuarios',json={'nome':'Tecnico','email':'tecnico@a.example','senha':'outra-senha-123','papel':'TECNICO'},headers=h)
     assert response.status_code==201
     tech=app.test_client()
-    assert tech.post('/api/auth/login',json={'email':'tecnico@a.example','senha':'outra-senha-123'}).status_code==200
+    login=tech.post('/api/auth/login',json={'email':'tecnico@a.example','senha':'outra-senha-123'})
+    assert login.status_code==200 and login.json['usuario']['termos_pendentes']
+    # Accounts created by an administrator accept the Terms themselves before using the API.
+    assert tech.get('/api/dispositivos').status_code==403
+    assert tech.post('/api/auth/aceite-termos',json={'aceite_termos':False},headers=auth_headers(tech)).status_code==400
+    accepted=tech.post('/api/auth/aceite-termos',json={'aceite_termos':True},headers=auth_headers(tech))
+    assert accepted.status_code==200 and not accepted.json['usuario']['termos_pendentes']
     assert tech.get('/api/usuarios').status_code==403
     assert tech.get('/api/dispositivos').status_code==200
     assert signed.put('/api/usuarios/'+str(response.json['id']),json={'ativo':False},headers=h).status_code==200
@@ -54,9 +60,9 @@ def test_device_crud_and_operational_fields(signed,device,app):
     assert signed.get('/api/dispositivos?arquivados=1').json[0]['arquivado_em']
     with app.app_context(): assert db.session.get(Dispositivo,id) is not None
 
-@pytest.mark.parametrize('field,value',[('cnpj','123'),('email','errado'),('senha','curta'),('nome','')])
+@pytest.mark.parametrize('field,value',[('cnpj','123'),('email','errado'),('senha','curta'),('nome',''),('aceite_termos',False)])
 def test_registration_invalid_input(client,field,value):
-    data={'nome_fantasia':'Empresa','cnpj':'11222333000181','nome':'Nome','email':'a@b.example','senha':'senha-valida-123'}
+    data={'nome_fantasia':'Empresa','cnpj':'11222333000181','nome':'Nome','email':'a@b.example','senha':'senha-valida-123','aceite_termos':True}
     data[field]=value
     assert client.post('/api/auth/registro',json=data).status_code==400
 
@@ -84,7 +90,7 @@ def test_password_whitespace_is_significant(client):
     secret = '  whitespace-matters  '
     registration = client.post('/api/auth/registro', json={
         'nome_fantasia': 'Empresa', 'cnpj': '11222333000181', 'nome': 'Admin',
-        'email': 'whitespace@example.test', 'senha': secret})
+        'email': 'whitespace@example.test', 'senha': secret, 'aceite_termos': True})
     assert registration.status_code == 201
     assert client.post('/api/auth/logout', headers=auth_headers(client)).status_code == 204
     assert client.post('/api/auth/login', json={'email': 'whitespace@example.test', 'senha': secret.strip()}).status_code == 401
@@ -93,7 +99,7 @@ def test_password_whitespace_is_significant(client):
 def test_numeric_and_alphanumeric_cnpj(client):
     response = client.post('/api/auth/registro', json={
         'nome_fantasia': 'Empresa', 'cnpj': '12.abc.345/01de-35', 'nome': 'Admin',
-        'email': 'cnpj@example.test', 'senha': 'cnpj-test-password'})
+        'email': 'cnpj@example.test', 'senha': 'cnpj-test-password', 'aceite_termos': True})
     assert response.status_code == 201
     assert response.json['empresa']['cnpj'] == '12ABC34501DE35'
     from conftest import auth_headers

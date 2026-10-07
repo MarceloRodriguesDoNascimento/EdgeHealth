@@ -19,7 +19,7 @@ def app(tmp_path):
 def client(app): return app.test_client()
 
 def register(client,email='admin@a.example',cnpj='11222333000181',name='Empresa A'):
-    return client.post('/api/auth/registro',json={'nome_fantasia':name,'cnpj':cnpj,'nome':'Administrador','email':email,'senha':'senha-de-teste-123'})
+    return client.post('/api/auth/registro',json={'nome_fantasia':name,'cnpj':cnpj,'nome':'Administrador','email':email,'senha':'senha-de-teste-123','aceite_termos':True})
 
 def auth_headers(client):
     cookie=client.get_cookie('edgehealth_csrf')

@@ -56,11 +56,11 @@ def export_report():
     company=db.session.get(Empresa,g.user.empresa_id)
     metadata=dict(empresa=company.nome_fantasia,cnpj=company.cnpj,inicio=iso(start),fim_exclusivo=iso(end),
                   gerado_em=iso(utcnow()),contagens=dict(dispositivos=len(devices),metricas=len(metrics),falhas=len(failures),diagnosticos=len(diagnoses)),
-                  observacao='Dispositivos: inventário atual, incluindo arquivados. Falhas: ocorrências sobrepostas ao período. Diagnósticos: última análise disponível das falhas selecionadas. Datas em UTC.')
+                  observacao='Dispositivos: inventário atual, incluindo arquivados. Falhas: ocorrências sobrepostas ao período. Diagnósticos: última análise disponível das falhas selecionadas. Datas em UTC. Métricas: coletor_id vazio indica worker local; fora_de_ordem=True indica amostra atrasada, mantida no histórico sem alterar estado ou ocorrências.')
     output=io.BytesIO()
     with zipfile.ZipFile(output,'w',zipfile.ZIP_DEFLATED) as z:
-        z.writestr('dispositivos.csv',csv_bytes([device_dict(d) for d in devices],['id','nome','ip','tipo','localizacao','status','ultima_coleta','arquivado_em']))
-        z.writestr('metricas.csv',csv_bytes([metric_dict(m) for m in metrics],['id','dispositivo_id','coletada_em','respondeu','latencia_ms','pacotes_enviados','pacotes_recebidos','perda_pacotes_pct','status']))
+        z.writestr('dispositivos.csv',csv_bytes([device_dict(d) for d in devices],['id','nome','ip','tipo','localizacao','status','ultima_coleta','arquivado_em','coletor']))
+        z.writestr('metricas.csv',csv_bytes([metric_dict(m) for m in metrics],['id','dispositivo_id','coletada_em','respondeu','latencia_ms','pacotes_enviados','pacotes_recebidos','perda_pacotes_pct','status','coletor_id','recebida_em','fora_de_ordem']))
         z.writestr('falhas.csv',csv_bytes([failure_dict(f) for f in failures],['id','dispositivo_id','dispositivo','tipo','estado','inicio','fim','duracao_segundos','severidade','justificativa','impacto','encerramento']))
         z.writestr('diagnosticos.csv',csv_bytes([diagnostic_dict(d) for d in diagnoses],['id','falha_id','estado','descricao','causas','evidencias','recomendacoes','analisado_em','versao_regras']))
         z.writestr('leia-me.json',json.dumps(metadata,ensure_ascii=False,indent=2))
