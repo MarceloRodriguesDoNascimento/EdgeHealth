@@ -16,6 +16,7 @@ import {Historico} from '../src/pages/Historico.js';
 import {Falha} from '../src/pages/Falha.js';
 import {Dashboard} from '../src/pages/Dashboard.js';
 import {Relatorios} from '../src/pages/Relatorios.js';
+import {Coletores} from '../src/pages/Coletores.js';
 import {apiFetch} from '../src/services/api.js';
 
 const nativeFetch=globalThis.fetch;
@@ -31,7 +32,7 @@ function button(text, within=document) {
 }
 async function submit(values, within=document, expectError=false) {
   const form=within.querySelector('form');assert.ok(form);
-  for(const [name,value] of Object.entries(values)) { const field=form.elements.namedItem(name);assert.ok(field,name);field.value=value; }
+  for(const [name,value] of Object.entries(values)) { const field=form.elements.namedItem(name);assert.ok(field,name);if(field.type==='checkbox')field.checked=Boolean(value);else field.value=value; }
   form.dispatchEvent(new Event('submit',{cancelable:true,bubbles:true}));
   await until(()=>!form.querySelector('[type=submit]').disabled,'Formulário não terminou');
   if(!expectError) assert.equal(form.querySelector('[role=alert]').textContent,'');
@@ -89,8 +90,8 @@ test('interface completa usa a API HTTP e SQLite migrado, sem respostas HTTP sim
 
   await t.test('cadastro de empresa, login, sessão e edição da organização',async()=>{
     mount(Login(data=>{session=data;},true));
-    await submit({nome_fantasia:'Empresa de integração',cnpj:'11222333000181',nome:'Administrador',email:'admin@integration.example',senha:'test-integration-password'});
-    assert.equal(session.usuario.papel,'ADMIN');
+    await submit({nome_fantasia:'Empresa de integração',cnpj:'11222333000181',nome:'Administrador',email:'admin@integration.example',senha:'test-integration-password',aceite_termos:true});
+    assert.equal(session.usuario.papel,'ADMIN');assert.equal(session.usuario.termos_pendentes,false);
     assert.equal((await apiFetch('/empresa')).nome_fantasia,'Empresa de integração');
     await apiFetch('/auth/logout',{method:'POST',body:'{}'});
     mount(Login(data=>{session=data;}));
@@ -115,13 +116,13 @@ test('interface completa usa a API HTTP e SQLite migrado, sem respostas HTTP sim
   });
 
   await t.test('cadastro, validação, edição e solicitação assíncrona de coleta',async()=>{
-    mount(await Dispositivos(session));button('Cadastrar dispositivo').click();
+    mount(await Dispositivos(session));button('Cadastrar dispositivo').click();await until(()=>document.querySelector('dialog'),'Formulário não abriu');
     const invalid=await submit({nome:'Servidor',ip:'IP inválido',tipo:'Servidor',localizacao:'Sala TI'},document.querySelector('dialog'),true);
     assert.match(invalid.querySelector('[role=alert]').textContent,/IPv4 ou IPv6/);
     await submit({ip:'127.0.0.1'},document.querySelector('dialog'));
     const devices=await apiFetch('/dispositivos');assert.equal(devices.length,1);deviceId=devices[0].id;
     assert.equal(devices[0].status,null);
-    button('Editar').click();await submit({nome:'Servidor atualizado'},document.querySelector('dialog'));
+    button('Editar').click();await until(()=>document.querySelector('dialog'),'Edição não abriu');await submit({nome:'Servidor atualizado'},document.querySelector('dialog'));
     assert.equal((await apiFetch(`/dispositivos/${deviceId}`)).nome,'Servidor atualizado');
     button('Coletar').click();await until(()=>requests.some(r=>r.path.endsWith('/coletas')&&r.status===202),'Coleta não solicitada');
     assert.equal((await apiFetch('/metricas')).total,0);
@@ -167,6 +168,30 @@ test('interface completa usa a API HTTP e SQLite migrado, sem respostas HTTP sim
     button('Fechar',document.querySelector('dialog')).click();
   });
 
+  await t.test('coletor remoto: cadastro, credencial única, atribuição e revogação pela tela',async()=>{
+    mount(await Coletores());button('Cadastrar coletor').click();
+    await submit({nome:'Coletor da filial'},document.querySelector('dialog'));
+    await until(()=>document.querySelector('dialog input[readonly]'),'Credencial não exibida');
+    const token=document.querySelector('dialog input[readonly]').value;
+    assert.match(token,/^ehc_/);
+    const [collector]=await apiFetch('/coletores');
+    assert.equal(collector.estado,'NUNCA_CONECTADO');assert.ok(!('token' in collector));
+    button('Fechar',document.querySelector('dialog')).click();
+    // The collector authenticates with its own credential, never with the user cookie.
+    const config=await nativeFetch(base+'/api/coletor/configuracao',{headers:{Authorization:'Bearer '+token}});
+    assert.equal(config.status,200);assert.deepEqual((await config.json()).dispositivos,[]);
+    mount(await Dispositivos(session));button('Editar').click();await until(()=>document.querySelector('dialog'),'Edição não abriu');
+    await submit({coletor_id:String(collector.id)},document.querySelector('dialog'));
+    assert.equal((await apiFetch(`/dispositivos/${deviceId}`)).coletor_id,collector.id);
+    assert.match(document.querySelector('#app').textContent,/Coletor da filial · sem contato recente|Coletor da filial/);
+    mount(await Coletores());button('Revogar').click();button('Confirmar',document.querySelector('dialog')).click();
+    await until(()=>!document.querySelector('dialog'),'Revogação pendente');
+    assert.equal((await nativeFetch(base+'/api/coletor/configuracao',{headers:{Authorization:'Bearer '+token}})).status,401);
+    mount(await Dispositivos(session));button('Editar').click();await until(()=>document.querySelector('dialog'),'Edição não abriu');
+    await submit({coletor_id:''},document.querySelector('dialog'));
+    assert.equal((await apiFetch(`/dispositivos/${deviceId}`)).coletor_id,null);
+  });
+
   await t.test('exportação gera ZIP real pela tela; arquivamento conserva todo o histórico',async()=>{
     const create=URL.createObjectURL,revoke=URL.revokeObjectURL;
     URL.createObjectURL=blob=>{download=blob;return 'blob:test-export';};URL.revokeObjectURL=()=>{};
@@ -191,6 +216,10 @@ test('interface completa usa a API HTTP e SQLite migrado, sem respostas HTTP sim
     const html=await production.text();
     const asset=html.match(/src="(\/assets\/[^\"]+\.js)"/)[1];
     assert.equal((await nativeFetch(base+asset)).status,200);
+    for(const page of ['/termos.html','/privacidade.html']){
+      const legal=await nativeFetch(base+page);
+      assert.equal(legal.status,200);assert.match(await legal.text(),/MINUTA/);
+    }
     const oldTarget=process.env.API_PROXY_TARGET;
     process.env.API_PROXY_TARGET=base;
     let vite;
