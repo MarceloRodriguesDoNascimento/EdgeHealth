@@ -16,3 +16,5 @@ playwright-report/
 edgehealth-fila.jsonl
 edgehealth-fila.tmp
 coletor.token
+deploy/pythonanywhere/*.zip
+*.token
