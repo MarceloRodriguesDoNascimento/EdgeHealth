@@ -5,9 +5,10 @@ from alembic.script import ScriptDirectory
 from sqlalchemy import select, text, inspect
 from werkzeug.exceptions import BadRequest, NotFound, Conflict
 from .extensions import db
-from .models import Empresa, Usuario, Dispositivo, Metrica, Falha, Impacto, Diagnostico, Recomendacao, utcnow
+from .models import Empresa, Usuario, Dispositivo, Metrica, Falha, Impacto, Diagnostico, Recomendacao, Coletor, utcnow
 from . import validation as v
 from .services import management as management
+from .services import collectors as collectors_service
 from .services.auth import require_auth, login, issue_session
 from .services.serialization import company_dict,user_dict,device_dict,metric_dict,failure_dict,diagnostic_dict,recommendation_dict
 from .services.queries import paginate,metric_query,failure_query,dashboard
@@ -26,9 +27,13 @@ def health():
     ready=set(db.metadata.tables).issubset(tables) and current==set(scripts.get_heads())
     return jsonify(status='ok' if ready else 'migrations_pendentes'),200 if ready else 503
 
+@api.get('/termos')
+def terms_version():
+    return jsonify(versao=current_app.config['TERMS_VERSION'])
+
 @api.post('/auth/registro')
 def register():
-    data=v.payload(['nome_fantasia','cnpj','telefone','nome','email','senha'],['nome_fantasia','cnpj','nome','email','senha'])
+    data=v.payload(['nome_fantasia','cnpj','telefone','nome','email','senha','aceite_termos'],['nome_fantasia','cnpj','nome','email','senha'])
     user=management.create_company_account(data)
     response=jsonify(usuario=user_dict(user),empresa=company_dict(db.session.get(Empresa,user.empresa_id)))
     response.status_code=201
@@ -41,12 +46,21 @@ def authenticate():
     return issue_session(user,jsonify(usuario=user_dict(user),empresa=company_dict(db.session.get(Empresa,user.empresa_id))))
 
 @api.get('/auth/me')
-@require_auth()
+@require_auth(terms=False)
 def me():
     return jsonify(usuario=user_dict(g.user),empresa=company_dict(db.session.get(Empresa,g.user.empresa_id)))
 
+@api.post('/auth/aceite-termos')
+@require_auth(terms=False)
+def accept_terms():
+    data=v.payload(['aceite_termos'],['aceite_termos'])
+    if data['aceite_termos'] is not True: raise BadRequest('Confirme o aceite dos Termos de Uso.')
+    management.accept_terms(g.user)
+    db.session.commit()
+    return jsonify(usuario=user_dict(g.user),empresa=company_dict(db.session.get(Empresa,g.user.empresa_id)))
+
 @api.post('/auth/logout')
-@require_auth()
+@require_auth(terms=False)
 def logout():
     db.session.delete(g.auth_session)
     db.session.commit()
@@ -97,12 +111,12 @@ def device(id):
 @api.post('/dispositivos')
 @require_auth()
 def create_device():
-    return jsonify(device_dict(management.save_device(v.payload(['nome','ip','tipo','localizacao'],['nome','ip','tipo','localizacao'])))),201
+    return jsonify(device_dict(management.save_device(v.payload(['nome','ip','tipo','localizacao','coletor_id'],['nome','ip','tipo','localizacao'])))),201
 
 @api.put('/dispositivos/<int:id>')
 @require_auth()
 def update_device(id):
-    return jsonify(device_dict(management.save_device(v.payload(['nome','ip','tipo','localizacao']),id)))
+    return jsonify(device_dict(management.save_device(v.payload(['nome','ip','tipo','localizacao','coletor_id']),id)))
 
 @api.delete('/dispositivos/<int:id>')
 @require_auth()
@@ -118,7 +132,8 @@ def request_collection(id):
     if d.lease_until and d.lease_until>utcnow(): raise Conflict('Uma coleta já está em andamento.')
     d.proxima_coleta=utcnow()
     db.session.commit()
-    return jsonify(mensagem='Coleta solicitada. O worker a executará no próximo ciclo.'),202
+    who='O coletor remoto a executará ao sincronizar a configuração.' if d.coletor_id else 'O worker a executará no próximo ciclo.'
+    return jsonify(mensagem='Coleta solicitada. '+who),202
 
 @api.get('/metricas')
 @require_auth()
@@ -183,6 +198,49 @@ def recommendations():
 @require_auth()
 def dashboard_endpoint():
     return jsonify(dashboard())
+
+@api.get('/coletores')
+@require_auth()
+def collectors():
+    # Read-only for every member (needed to assign devices); management is admin-only.
+    return jsonify([collectors_service.collector_dict(c) for c in db.session.scalars(
+        select(Coletor).where(Coletor.empresa_id==g.user.empresa_id).order_by(Coletor.revogado_em.isnot(None),Coletor.nome,Coletor.id))])
+
+@api.post('/coletores')
+@require_auth(admin=True)
+def create_collector():
+    data=v.payload(['nome'],['nome'])
+    c,token=collectors_service.create_collector(data['nome'])
+    # The plain credential is returned only once and never stored.
+    return jsonify(coletor=collectors_service.collector_dict(c),token=token),201
+
+@api.post('/coletores/<int:id>/rotacionar')
+@require_auth(admin=True)
+def rotate_collector(id):
+    v.payload([])
+    c,token=collectors_service.rotate_collector(id)
+    return jsonify(coletor=collectors_service.collector_dict(c),token=token)
+
+@api.post('/coletores/<int:id>/revogar')
+@require_auth(admin=True)
+def revoke_collector(id):
+    v.payload([])
+    return jsonify(collectors_service.collector_dict(collectors_service.revoke_collector(id)))
+
+@api.get('/coletor/configuracao')
+@collectors_service.require_collector
+def collector_config():
+    return jsonify(collectors_service.collector_config())
+
+@api.post('/coletor/heartbeat')
+@collectors_service.require_collector
+def collector_heartbeat():
+    return jsonify(collectors_service.heartbeat(v.payload(['versao','fila_pendente','erro'])))
+
+@api.post('/coletor/amostras')
+@collectors_service.require_collector
+def collector_samples():
+    return jsonify(collectors_service.ingest(v.payload(['amostras','erros'])))
 
 @api.get('/relatorios/exportar')
 @require_auth()

@@ -83,6 +83,40 @@ def register_cli(app):
         db.session.commit()
         click.echo('Conta ativada e sessões anteriores revogadas.')
 
+    @app.cli.command('purge-history')
+    @click.option('--days', type=click.IntRange(30, 3650), default=None, help='Retenção das amostras em dias (padrão: METRIC_RETENTION_DAYS).')
+    @click.option('--dry-run', is_flag=True, help='Somente informa quantos registros seriam removidos.')
+    def purge_history(days, dry_run):
+        """Apply the retention policy to raw samples and expired security records."""
+        from .services.privacy import purge_history as purge
+        result = purge(days or app.config['METRIC_RETENTION_DAYS'], dry_run)
+        click.echo(json.dumps(result, ensure_ascii=False))
+
+    @app.cli.command('anonymize-user')
+    @click.option('--email', required=True)
+    @click.option('--yes', is_flag=True, help='Confirma a operação irreversível.')
+    def anonymize_user(email, yes):
+        """Data-subject request: remove name/e-mail of an account while keeping company history."""
+        from .services.privacy import anonymize_user as anonymize
+        if not yes:
+            raise click.ClickException('Operação irreversível. Revise o pedido do titular e repita com --yes.')
+        try:
+            anonymize(email.strip().lower())
+        except ValueError as error:
+            raise click.ClickException(str(error)) from error
+        click.echo('Conta anonimizada e sessões revogadas.')
+
+    @app.cli.command('backup')
+    @click.option('--output', required=True, type=click.Path(dir_okay=False))
+    def backup(output):
+        """Consistent online copy of the SQLite database (never overwrites a file)."""
+        from .services.privacy import backup_sqlite
+        try:
+            backup_sqlite(output)
+        except (ValueError, OSError) as error:
+            raise click.ClickException(str(error)) from error
+        click.echo('Backup concluído. Armazene-o com acesso restrito: contém dados pessoais e da infraestrutura.')
+
     @app.cli.command('export-legacy')
     @click.option('--output', required=True, type=click.Path(dir_okay=False))
     def export_legacy(output):

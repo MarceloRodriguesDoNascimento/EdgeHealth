@@ -30,4 +30,15 @@ class Config:
     SEVERITY_GROUP_SIZE = 3
     SEVERITY_HIGH_USERS = 10
     SEVERITY_CRITICAL_USERS = 50
-    FRONTEND_DIST = str(Path(__file__).resolve().parents[2] / 'frontend' / 'dist')
+    # Remote collectors (HTTPS ingestion).
+    COLLECTOR_STALE_SECONDS = int(os.getenv('COLLECTOR_STALE_SECONDS', '180'))
+    COLLECTOR_MAX_BATCH = int(os.getenv('COLLECTOR_MAX_BATCH', '200'))
+    COLLECTOR_MAX_REQUESTS_PER_MINUTE = int(os.getenv('COLLECTOR_MAX_REQUESTS_PER_MINUTE', '120'))
+    COLLECTOR_MAX_SAMPLE_AGE_HOURS = int(os.getenv('COLLECTOR_MAX_SAMPLE_AGE_HOURS', '24'))
+    COLLECTOR_MAX_CLOCK_SKEW_SECONDS = int(os.getenv('COLLECTOR_MAX_CLOCK_SKEW_SECONDS', '120'))
+    COLLECTOR_MAX_CONTENT_LENGTH = 512 * 1024
+    # Privacy and operations.
+    TERMS_VERSION = os.getenv('TERMS_VERSION', '2026-10')
+    METRIC_RETENTION_DAYS = int(os.getenv('METRIC_RETENTION_DAYS', '180'))
+    TRUST_PROXY = int(os.getenv('TRUST_PROXY', '0'))
+    FRONTEND_DIST =str(Path(__file__).resolve().parents[2] / 'frontend' / 'dist')
