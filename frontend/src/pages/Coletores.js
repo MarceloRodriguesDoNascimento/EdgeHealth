@@ -2,7 +2,9 @@ import { el, input, label, form, button, modal, table, badge, date, pageHeader, 
 import { apiFetch, json } from '../services/api.js';
 
 const STATES = { ATIVO: ['Ativo', 'ONLINE'], DESATUALIZADO: ['Sem contato recente', 'OFFLINE'], NUNCA_CONECTADO: ['Aguardando conexão', 'SEM_COLETA'], REVOGADO: ['Revogado', 'SEM_COLETA'] };
-export const collectorBadge = state => badge(...(STATES[state] || [state, 'SEM_COLETA']));
+// Latest GitHub release asset (built by collector/windows/build.ps1); the .exe is never served by this app.
+export const WINDOWS_DOWNLOAD = 'https://github.com/MarceloRodriguesDoNascimento/EdgeHealth/releases/latest/download/EdgeHealthColetor.exe';
+export const collectorBadge =state => badge(...(STATES[state] || [state, 'SEM_COLETA']));
 
 // The plain credential exists only in this response; the server keeps a hash.
 function showToken(collector, token) {
@@ -45,7 +47,9 @@ export async function Coletores() {
     close(); await load(); showToken(result.coletor, result.token);
   }));
   await load();
-  return el('section', {}, pageHeader('Coletores', 'Agentes que medem os dispositivos a partir da rede da empresa.', button('Cadastrar coletor', create, 'primary')),
+  return el('section', {}, pageHeader('Coletores', 'Agentes que medem os dispositivos a partir da rede da empresa.', el('div', { className: 'actions' },
+      el('a', { href: WINDOWS_DOWNLOAD, className: 'button', rel: 'noopener', download: '' }, 'Baixar coletor para Windows'),
+      button('Cadastrar coletor', create, 'primary'))),
     el('p', { className: 'muted' }, 'Dispositivos sem coletor atribuído são medidos pelo worker local do servidor, que só alcança redes acessíveis a ele. Na hospedagem em nuvem, atribua cada dispositivo da rede privada a um coletor.'),
     body);
 }
