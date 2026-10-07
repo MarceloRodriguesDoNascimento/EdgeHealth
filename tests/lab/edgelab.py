@@ -32,6 +32,7 @@ import urllib.error
 import urllib.request
 import zipfile
 from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 
 LAB = Path(__file__).resolve().parent
@@ -71,6 +72,28 @@ ANDAR2 = ['switch2', 'ap', 'camera', 'voip']
 
 def now():
     return datetime.now(timezone.utc)
+
+
+# Offset between the EdgeHealth server and this Windows clock, from the HTTP "Date" header.
+# Failure times come from the server/collector clock; this Windows clock may be minutes off,
+# so every "since" and time window must use server_now(), never now().
+CLOCK = {'offset': timedelta(0)}
+
+
+def server_now():
+    return now() + CLOCK['offset']
+
+
+def track_server_clock(headers):
+    try:
+        server = parsedate_to_datetime(headers['Date'])
+        local = now()
+        offset = server - local
+        # The Date header has 1 s resolution: ignore sub-second jitter.
+        if abs((offset - CLOCK['offset']).total_seconds()) > 1:
+            CLOCK['offset'] = offset
+    except (KeyError, TypeError, ValueError):
+        pass
 
 
 def say(msg):
@@ -170,9 +193,11 @@ class Client:
         for attempt in range(5):
             try:
                 with self.opener.open(req, timeout=30) as r:
+                    track_server_clock(r.headers)
                     payload = r.read()
                     return payload if raw else json.loads(payload or b'null')
             except urllib.error.HTTPError as e:
+                track_server_clock(e.headers)
                 text = e.read().decode(errors='replace')
                 try:
                     parsed = json.loads(text)
@@ -395,14 +420,16 @@ class Scenario:
             time.sleep(15)
 
     def iso(self):
-        # Failure "inicio" is the first sample after the injection; a 5 s margin covers clock jitter.
-        return (now() - timedelta(seconds=5)).isoformat(timespec='seconds').replace('+00:00', '')
+        # Failure "inicio" is the first sample after the injection, stamped by the collector
+        # (synced to the server). Server time minus 5 s covers the Date header resolution.
+        self.c.get('/termos')  # refreshes the server clock offset
+        return (server_now() - timedelta(seconds=5)).isoformat(timespec='seconds').replace('+00:00', '')
 
     def snapshot(self, moment, failure_ids=()):
         """Night mode evidence: API JSON at a key moment (no credentials in any of these payloads)."""
         self.snap_no += 1
         self.run_dir.mkdir(parents=True, exist_ok=True)
-        data = dict(momento=moment, capturado_em=now().isoformat())
+        data = dict(momento=moment, capturado_em_servidor=server_now().isoformat())
         for name, path in [('dashboard', '/dashboard'), ('dispositivos', '/dispositivos?arquivados=1'),
                            ('falhas', '/falhas?limite=200'), ('coletores', '/coletores')]:
             try:
@@ -412,8 +439,13 @@ class Scenario:
         for col in data.get('coletores') or []:
             if isinstance(col, dict):
                 col.pop('token_prefixo', None)
+        # Details (diagnosis, causes, evidence, recommendations) of the requested failures,
+        # every open failure and every failure started in the last 15 minutes (server time).
+        recent = (server_now() - timedelta(minutes=15)).isoformat(timespec='seconds').replace('+00:00', '')
+        listed = data['falhas'].get('items', []) if isinstance(data['falhas'], dict) else []
+        ids = list(dict.fromkeys([*failure_ids, *(f['id'] for f in listed if f['estado'] == 'ABERTA' or f['inicio'] >= recent)]))
         data['detalhes'] = {}
-        for fid in failure_ids:
+        for fid in ids[:30]:
             try:
                 data['detalhes'][fid] = self.c.get(f'/falhas/{fid}')
             except Exception as e:  # noqa: BLE001
@@ -553,8 +585,12 @@ class Scenario:
                             f'falha #{f and f["id"]}')
                 self.moment(4, 'Detalhe da 3ª falha do Sensor IoT (RECORRENTE)', '04-diagnostico-recorrente.png', [f['id']] if f else [])
             lab('restaurar', 'sensor')
-            if f:
-                self.wait(f'sensor volta {cycle}', lambda: self.closed('sensor', f['id']), INTERVAL * 5)
+            # Each drop must be a separate incident: wait for the device itself to be ONLINE
+            # (2 good samples), even when the failure was not found, before the next drop.
+            back = self.wait(f'sensor volta {cycle}', lambda: self.device('sensor')['status'] == 'ONLINE'
+                             and (not f or self.closed('sensor', f['id'])), INTERVAL * 6)
+            if not back:
+                raise RuntimeError(f'Sensor não voltou a ONLINE após a queda {cycle}: as quedas se fundiriam em uma falha só.')
 
     def s11_coletor(self):
         before = len(self.c.get('/falhas?estado=ABERTA&limite=50')['items'])
@@ -652,14 +688,16 @@ class Scenario:
         sample = lambda q: c.get('/falhas?limite=200&' + q)['items']
         closed, high = sample('estado=ENCERRADA'), sample('severidade=ALTA')
         mine = sample(f'dispositivo_id={self.ids["sensor"]}')
-        start = (now() - timedelta(hours=3)).strftime('%Y-%m-%dT%H:%M:%S')
+        start = (server_now() - timedelta(hours=3)).strftime('%Y-%m-%dT%H:%M:%S')
         period = sample(f'inicio={start}')
         bad = c.status_of('GET', '/falhas?estado=XYZ')
         ok = (closed and all(f['estado'] == 'ENCERRADA' for f in closed) and high and all(f['severidade'] == 'ALTA' for f in high)
               and mine and all(f['dispositivo_id'] == self.ids['sensor'] for f in mine) and period and bad == 400)
         self.record('Extra: filtros do histórico', 'estado, severidade, dispositivo e período filtram; valor inválido = 400',
                     f'encerradas={len(closed)}, altas={len(high)}, sensor={len(mine)}, período={len(period)}, inválido={bad}', bool(ok))
-        f = c.get(f'/falhas/{high[0]["id"]}') if high else None
+        # A failure whose diagnosis found causes (a long recovery-free incident may legitimately have none).
+        f = next((d for d in (c.get(f'/falhas/{x["id"]}') for x in (high + closed)[:15])
+                  if ((d.get('diagnostico') or {}).get('causas'))), None)
         diag = (f or {}).get('diagnostico') or {}
         d2 = c.get(f'/diagnosticos/{diag["id"]}') if diag.get('id') else {}
         ok = bool(f and diag.get('causas') and diag.get('recomendacoes') and f.get('justificativa', {}).get('motivos') and d2.get('falha_id') == f['id'])
@@ -685,7 +723,13 @@ class Scenario:
 
     def s10_severidade(self):
         t = self.testnet_failure
-        if t:
+        if t and getattr(self, 'skip_critical_wait', False):
+            f = self.c.get(f'/falhas/{t["id"]}')
+            minutes = f['duracao_segundos'] / 60
+            self.record('10 Severidade CRITICA (duração)', f'192.0.2.1 aberta há {CRITICAL_MINUTES}+ min -> CRITICA',
+                        f'{f["severidade"]} com {minutes:.0f} min (espera desligada)',
+                        f['severidade'] == 'CRITICA' if minutes >= CRITICAL_MINUTES else None, f'falha #{t["id"]}')
+        elif t:
             elapsed = lambda: self.c.get(f'/falhas/{t["id"]}')['duracao_segundos'] / 60
             if elapsed() < CRITICAL_MINUTES + 1:
                 wait = (CRITICAL_MINUTES + 1 - elapsed()) * 60
@@ -706,7 +750,7 @@ class Scenario:
                     '; '.join(f'{k}: {", ".join(sorted(v))}' for k, v in sorted(levels.items())),
                     {'BAIXA', 'MEDIA', 'ALTA', 'CRITICA'} <= set(levels), self.snapshot('severidades'))
 
-    def report(self, started):
+    def report(self, started, path=REPORT):
         failed = [r for r in self.rows if r['ok'] is False]
         lines = ['# Relatório do laboratório EdgeHealth', '',
                  f'- Produção: {API}', f'- Execução: {started.astimezone():%d/%m/%Y %H:%M} → {now().astimezone():%H:%M}',
@@ -721,38 +765,34 @@ class Scenario:
                       'Os momentos já passaram; o estado ficou registrado nas evidências JSON. Para a apresentação, capture as telas '
                       'equivalentes pelo histórico (filtre pelo dispositivo e abra a falha indicada):', '', *self.morning,
                       f'{len(self.morning) + 1}. **Histórico de falhas com tudo encerrado** → `screenshots/06-historico-final.png`']
-        REPORT.write_text('\n'.join(lines) + '\n', encoding='utf-8')
-        say(f'Relatório: tests/lab/{REPORT.name} — {len(self.rows) - len(failed)}/{len(self.rows)} OK')
+        path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+        say(f'Relatório: tests/lab/{path.name} — {len(self.rows) - len(failed)}/{len(self.rows)} OK')
 
 
 def cenario(args):
-    only = {int(x) for x in args.so.split(',')} if args.so else None
-    run = lambda n: only is None or n in only
+    # --so takes scenario numbers and extra names: 2,3,4,5,6,7,11,12,manual,tecnico,isolamento,detalhe,exportacao
+    only = {x.strip() for x in args.so.split(',')} if args.so else None
+    run = lambda key: only is None or str(key) in only
     (LAB / 'screenshots').mkdir(exist_ok=True)
     started = now()
     s = Scenario(args.prints, args.noturno)
+    s.skip_critical_wait = args.sem_espera_critica
     keep_awake(True)
     try:
         ensure_lab()
         lab('restaurar', 'todos')
         start_collector()
         s.step('0 Linha de base (1 e 9)', s.s0_baseline)
-        if args.noturno:
-            s.step('Extra: coleta manual', s.e_coleta_manual)
-            s.step('Extra: técnico', s.e_tecnico)
-            s.step('Extra: isolamento', s.e_isolamento)
-        for n, name, fn in [(2, '2 Localizada', s.s2_localizada), (3, '3 Compartilhada', s.s3_compartilhada),
-                            (4, '4 Congestionamento', s.s4), (5, '5 Latência', s.s5), (6, '6 Evidência insuficiente', s.s6),
-                            (7, '7 Recorrente', s.s7_recorrente)]:
-            if run(n):
+        steps = [('manual', 'Extra: coleta manual', s.e_coleta_manual), ('tecnico', 'Extra: técnico', s.e_tecnico),
+                 ('isolamento', 'Extra: isolamento', s.e_isolamento),
+                 (2, '2 Localizada', s.s2_localizada), (3, '3 Compartilhada', s.s3_compartilhada),
+                 (4, '4 Congestionamento', s.s4), (5, '5 Latência', s.s5), (6, '6 Evidência insuficiente', s.s6),
+                 (7, '7 Recorrente', s.s7_recorrente), (11, '11 Coletor parado', s.s11_coletor),
+                 (12, '12 Arquivar/desarquivar', s.s12_arquivar),
+                 ('detalhe', 'Extra: filtros e detalhe', s.e_filtros_detalhe), ('exportacao', 'Extra: exportação', s.e_exportacao)]
+        for key, name, fn in steps:
+            if run(key):
                 s.step(name, fn)
-        if run(11):
-            s.step('11 Coletor parado', s.s11_coletor)
-        if run(12):
-            s.step('12 Arquivar/desarquivar', s.s12_arquivar)
-        if args.noturno:
-            s.step('Extra: filtros e detalhe', s.e_filtros_detalhe)
-            s.step('Extra: exportação', s.e_exportacao)
         s.step('10 Severidade', s.s10_severidade)
         s.moment(6, 'Histórico de falhas com tudo encerrado', '06-historico-final.png') if not args.noturno else s.snapshot('final')
     except KeyboardInterrupt:
@@ -767,7 +807,8 @@ def cenario(args):
         if args.noturno:
             lab('liberar', check=False)
         keep_awake(False)
-        s.report(started)
+        # A partial re-run (--so) keeps the full night report intact.
+        s.report(started, LAB / 'relatorio-reexecucao.md' if args.so else REPORT)
 
 
 def noturno(_):
@@ -776,7 +817,7 @@ def noturno(_):
     keep_awake(True)
     preparar()
     subir()
-    cenario(argparse.Namespace(so=None, prints=False, noturno=True))
+    cenario(argparse.Namespace(so=None, prints=False, noturno=True, sem_espera_critica=False))
 
 
 def main():
@@ -791,7 +832,8 @@ def main():
     c = sub.add_parser('cenario')
     c.add_argument('--prints', action='store_true', help='pausa nos 6 momentos de captura de tela')
     c.add_argument('--noturno', action='store_true', help='sem pausas; evidências JSON e lista de prints no relatório')
-    c.add_argument('--so', help='só estes cenários, ex.: 2,3 (a linha de base sempre roda)')
+    c.add_argument('--so', help='só estes, ex.: 2,3,7,detalhe (a linha de base e a severidade sempre rodam)')
+    c.add_argument('--sem-espera-critica', action='store_true', help='não espera 60 min pelo TEST-NET')
     c.set_defaults(fn=cenario)
     args = p.parse_args()
     try:

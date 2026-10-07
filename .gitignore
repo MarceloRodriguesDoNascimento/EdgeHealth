@@ -21,7 +21,7 @@ deploy/pythonanywhere/*.zip
 # Network lab (tests/lab): credentials, run outputs and evidence stay local
 tests/lab/.credenciais-lab.json
 tests/lab/execucao.log
-tests/lab/relatorio.md
+tests/lab/relatorio*.md
 tests/lab/evidencias/
 tests/lab/resultados/
 tests/lab/screenshots/
