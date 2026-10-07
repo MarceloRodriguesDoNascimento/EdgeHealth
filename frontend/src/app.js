@@ -1,6 +1,6 @@
 import './styles.css';
 import { apiFetch } from './services/api.js';
-import { el,button,toast } from './ui/dom.js';
+import { el,button,toast,confirmAction,brandLogo } from './ui/dom.js';
 import { Login, TermsPending } from './pages/Login.js';
 import { Coletores } from './pages/Coletores.js';
 import { Dashboard } from './pages/Dashboard.js';
@@ -13,7 +13,9 @@ import { Relatorios } from './pages/Relatorios.js';
 
 const app=document.querySelector('#app');
 let session=null,cleanup=()=>{},generation=0;
-async function logout(){try{await apiFetch('/auth/logout',{method:'POST',body:'{}'});signedOut();}catch(e){if(e.status===401)signedOut();else toast(e.message,true);}}
+// A failed logout keeps the dialog open and shows the error; an already-expired session just signs out.
+async function endSession(){try{await apiFetch('/auth/logout',{method:'POST',body:'{}'});}catch(e){if(e.status!==401)throw e;}signedOut();}
+const logout=()=>confirmAction('Sair do EdgeHealth?','Sua sessão será encerrada neste navegador.',endSession,'Sair');
 function enter(data){
   session=data;
   if(session.usuario.termos_pendentes){app.replaceChildren(TermsPending(session,enter,logout));return;}
@@ -24,7 +26,7 @@ function signedOut(){session=null;cleanup();generation++;app.replaceChildren(Log
 function shell(){
   const links=[['dashboard','Visão da rede','◫'],['dispositivos','Dispositivos','▤'],['historico','Histórico de falhas','◷'],['relatorios','Relatórios','↓'],...(session.usuario.papel==='ADMIN'?[['coletores','Coletores','⇅'],['empresa','Empresa','▦'],['usuarios','Equipe','◎']]:[])];
   app.replaceChildren(el('div',{className:'app-layout'},
-    el('aside',{className:'sidebar'},el('a',{href:'#dashboard',className:'brand'},el('span',{className:'brand-mark'},'E'),'EdgeHealth'),
+    el('aside',{className:'sidebar'},el('a',{href:'#dashboard',className:'brand'},brandLogo(),el('span',{'aria-hidden':'true'},'EdgeHealth')),
       el('p',{className:'nav-caption'},'ESPAÇO DA EMPRESA'),el('nav',{'aria-label':'Navegação principal'},links.map(([key,text,icon])=>el('a',{href:`#${key}`,dataset:{route:key}},el('span',{'aria-hidden':'true'},icon),text))),
       el('div',{className:'sidebar-bottom'},el('span',{className:'small'},'Conectividade com contexto'),el('strong',{},'EdgeHealth / MVP'))),
     el('div',{className:'workspace'},el('header',{className:'topbar'},el('div',{},el('span',{className:'muted small'},'EMPRESA'),el('strong',{id:'company-name'},session.empresa.nome_fantasia)),
