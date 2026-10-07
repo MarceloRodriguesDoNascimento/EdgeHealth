@@ -124,6 +124,12 @@ def archive_device(id):
     management.archive_device(id)
     return '',204
 
+@api.post('/dispositivos/<int:id>/desarquivar')
+@require_auth()
+def restore_device(id):
+    v.payload([])
+    return jsonify(device_dict(management.restore_device(id)))
+
 @api.post('/dispositivos/<int:id>/coletas')
 @require_auth()
 def request_collection(id):

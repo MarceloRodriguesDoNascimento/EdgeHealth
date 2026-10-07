@@ -39,7 +39,11 @@ export async function Dispositivos(session) {
           button('Coletar', async () => { try { const result = await apiFetch(`/dispositivos/${d.id}/coletas`, { method: 'POST', body: '{}' }); toast(result.mensagem); } catch(e) { toast(e.message,true); } }, 'ghost'),
           button('Arquivar', () => confirmAction('Arquivar dispositivo?', `“${d.nome}” deixará de ser monitorado. Métricas e ocorrências serão preservadas.`, async () => {
             await apiFetch(`/dispositivos/${d.id}`, { method: 'DELETE' }); toast('Dispositivo arquivado.'); await refresh();
-          }), 'ghost danger-text')] : null)
+          }, 'Arquivar'), 'ghost danger-text')]
+          : button('Desarquivar', () => confirmAction('Desarquivar dispositivo?', `“${d.nome}” voltará a ser monitorado.`, async () => {
+            await apiFetch(`/dispositivos/${d.id}/desarquivar`, { method: 'POST', body: '{}' });
+            toast('Dispositivo desarquivado. Aguardando a primeira coleta.'); await refresh();
+          }, 'Desarquivar', 'primary'), 'ghost'))
     ])));
   };
   archived.addEventListener('change', () => refresh().catch(e => toast(e.message,true)));

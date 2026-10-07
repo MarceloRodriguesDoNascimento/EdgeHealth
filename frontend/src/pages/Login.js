@@ -1,9 +1,9 @@
-import { el, label, input, form, button } from '../ui/dom.js';
+import { el, label, input, form, button, brandLogo } from '../ui/dom.js';
 import { apiFetch, json } from '../services/api.js';
 
 export function Login(onSuccess, registration = false) {
   const intro = el('div', { className: 'auth-intro' },
-    el('div', { className: 'brand light' }, el('span', { className: 'brand-mark' }, 'E'), 'EdgeHealth'),
+    el('div', { className: 'brand light' }, brandLogo(), el('span', { 'aria-hidden': 'true' }, 'EdgeHealth')),
     el('div', {}, el('span', { className: 'eyebrow' }, 'MONITORAMENTO DE REDE'),
       el('h1', {}, 'Entenda o que acontece na sua rede.'),
       el('p', {}, 'Acompanhe dispositivos, investigue ocorrências e consulte o histórico em um só lugar.')),

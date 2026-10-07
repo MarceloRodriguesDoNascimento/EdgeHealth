@@ -1,7 +1,7 @@
 import {test,beforeEach,afterEach} from 'node:test';
 import assert from 'node:assert/strict';
 import {JSDOM} from 'jsdom';
-import {el,form,table,confirmAction} from '../src/ui/dom.js';
+import {el,form,table,confirmAction,brandLogo} from '../src/ui/dom.js';
 import {apiFetch} from '../src/services/api.js';
 
 let dom;
@@ -59,6 +59,27 @@ test('destructive action needs confirmation in the interface',async()=>{
   await new Promise(r=>setTimeout(r,0));
   assert.equal(ran,true);
   assert.equal(document.querySelector('dialog'),null);
+});
+
+test('confirmation dialog is labelled, focuses Cancelar and closing it (Esc) never runs the action',async()=>{
+  let ran=false;
+  confirmAction('Sair do EdgeHealth?','Sua sessão será encerrada neste navegador.',async()=>{ran=true;},'Sair');
+  const dialog=document.querySelector('dialog');
+  const labels=[...dialog.querySelectorAll('button')].map(b=>b.textContent);
+  assert.deepEqual(labels,['Fechar','Cancelar','Sair']);
+  assert.equal(document.getElementById(dialog.getAttribute('aria-labelledby')).textContent,'Sair do EdgeHealth?');
+  const cancel=[...dialog.querySelectorAll('button')].find(b=>b.textContent==='Cancelar');
+  assert.equal(cancel.autofocus,true);
+  dialog.close();  // what the browser does on Esc for a modal <dialog>
+  await new Promise(r=>setTimeout(r,0));
+  assert.equal(ran,false);
+  assert.equal(document.querySelector('dialog'),null);
+});
+
+test('brand logo has an accessible name',()=>{
+  const logo=brandLogo();
+  assert.equal(logo.getAttribute('src'),'/logo.svg');
+  assert.equal(logo.alt,'EdgeHealth');
 });
 
 test('failed confirmation keeps the dialog usable and displays the API error',async()=>{

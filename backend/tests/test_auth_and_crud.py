@@ -2,7 +2,7 @@ import pytest
 from sqlalchemy import select,text
 from werkzeug.security import check_password_hash
 from app import db
-from app.models import Usuario,Dispositivo,AuthSession
+from app.models import Usuario,Dispositivo,AuthSession,utcnow
 from conftest import register,auth_headers
 
 
@@ -59,6 +59,46 @@ def test_device_crud_and_operational_fields(signed,device,app):
     assert signed.get('/api/dispositivos').json==[]
     assert signed.get('/api/dispositivos?arquivados=1').json[0]['arquivado_em']
     with app.app_context(): assert db.session.get(Dispositivo,id) is not None
+
+def test_restore_archived_device(signed,device,app):
+    h=auth_headers(signed)
+    id=device['id']
+    assert signed.post(f'/api/dispositivos/{id}/desarquivar',json={},headers=h).status_code==409  # not archived
+    with app.app_context():
+        d=db.session.get(Dispositivo,id)
+        d.status,d.falhas_consecutivas='OFFLINE',3
+        db.session.commit()
+    assert signed.delete(f'/api/dispositivos/{id}',headers=h).status_code==204
+    # Same rules as the other device routes: CSRF and current Terms are required.
+    assert signed.post(f'/api/dispositivos/{id}/desarquivar',json={}).status_code==403
+    restored=signed.post(f'/api/dispositivos/{id}/desarquivar',json={},headers=h)
+    assert restored.status_code==200
+    assert restored.json['arquivado_em'] is None and restored.json['status'] is None
+    assert [d['id'] for d in signed.get('/api/dispositivos').json]==[id]
+    with app.app_context():
+        d=db.session.get(Dispositivo,id)
+        assert d.falhas_consecutivas==0 and d.proxima_coleta<=utcnow()
+    from app.services.monitoring import run_cycle, ProbeResult
+    assert run_cycle(app,lambda *_:ProbeResult(4,4,1))==1  # monitored again
+
+
+def test_restore_respects_tenant_ip_and_terms(signed,device,app):
+    h=auth_headers(signed)
+    id=device['id']
+    assert signed.delete(f'/api/dispositivos/{id}',headers=h).status_code==204
+    other=app.test_client()
+    assert register(other,email='admin@b.example',cnpj='11444777000161',name='Empresa B').status_code==201
+    assert other.post(f'/api/dispositivos/{id}/desarquivar',json={},headers=auth_headers(other)).status_code==404
+    # A new active device took the same IP: restoring would violate the unique active IP.
+    assert signed.post('/api/dispositivos',json={'nome':'Novo','ip':device['ip'],'tipo':'Servidor','localizacao':'TI'},headers=h).status_code==201
+    conflict=signed.post(f'/api/dispositivos/{id}/desarquivar',json={},headers=h)
+    assert conflict.status_code==409 and 'IP' in conflict.json['erro']
+    signed.post('/api/usuarios',json={'nome':'Tec','email':'tec@a.example','senha':'senha-tecnico-1'},headers=h)
+    tech=app.test_client()
+    tech.post('/api/auth/login',json={'email':'tec@a.example','senha':'senha-tecnico-1'})
+    assert tech.post(f'/api/dispositivos/{id}/desarquivar',json={},headers=auth_headers(tech)).status_code==403  # Terms pending
+    with app.app_context(): assert db.session.get(Dispositivo,id).arquivado_em is not None
+
 
 @pytest.mark.parametrize('field,value',[('cnpj','123'),('email','errado'),('senha','curta'),('nome',''),('aceite_termos',False)])
 def test_registration_invalid_input(client,field,value):
