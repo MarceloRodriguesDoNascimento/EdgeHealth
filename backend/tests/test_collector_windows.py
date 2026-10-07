@@ -106,3 +106,96 @@ def test_restricted_machine_install_is_reported_not_crashing(monkeypatch, tmp_pa
             raise PermissionError(13, 'Acesso negado')
     monkeypatch.setattr(ew, 'scope_dir', lambda scope: Locked(tmp_path / scope))
     assert ew.installed() == ('maquina', tmp_path / 'maquina')
+
+
+# --- Regression: install made from a terminal inside an MSIX-packaged app (Claude desktop) -----
+# Writes to %LOCALAPPDATA% were redirected to Packages/<family>/LocalCache/Local, the task kept
+# the path the installer saw, and Task Scheduler (outside the package) failed with 0x80070002.
+
+def test_long_path_prefixes_are_removed():
+    assert ew.strip_long_prefix(r'\\?\C:\Users\a\AppData\Local\Packages\P\LocalCache\Local\EdgeHealth') == \
+        r'C:\Users\a\AppData\Local\Packages\P\LocalCache\Local\EdgeHealth'
+    assert ew.strip_long_prefix(r'\\?\UNC\srv\share\EdgeHealth') == r'\\srv\share\EdgeHealth'
+    assert ew.strip_long_prefix(r'C:\plain') == r'C:\plain'
+
+
+@pytest.mark.skipif(sys.platform != 'win32', reason='GetFinalPathNameByHandle')
+def test_physical_path_of_a_normal_folder_is_itself(tmp_path):
+    import os
+    assert os.path.normcase(ew.physical(tmp_path)) == os.path.normcase(tmp_path.resolve())
+
+
+@pytest.fixture
+def fake_windows(monkeypatch, tmp_path):
+    """Isolated LOCALAPPDATA/ProgramData and a recorder instead of schtasks/icacls/taskkill."""
+    local, program_data = tmp_path / 'Local', tmp_path / 'ProgramData'
+    local.mkdir(); program_data.mkdir()
+    monkeypatch.setenv('LOCALAPPDATA', str(local)); monkeypatch.setenv('ProgramData', str(program_data))
+    calls = []
+
+    class Done:
+        returncode, stdout, stderr = 0, '', ''
+
+    def run(args, check=True):
+        entry = list(args)
+        if '/XML' in args and args[0] == 'schtasks' and '/Create' in args:
+            entry.append(Path(args[args.index('/XML') + 1]).read_text(encoding='utf-16'))
+        calls.append(entry)
+        return Done()
+    monkeypatch.setattr(ew, 'run', run)
+    monkeypatch.setattr(ew, 'current_user_sid', lambda: 'S-1-5-21-1-2-3-1001')
+    monkeypatch.setattr(ew, 'packaged', lambda: False)
+    return local, calls
+
+
+def virtual_install(local):
+    d = local / 'Packages' / 'Claude_pzs8sxrjxfjjc' / 'LocalCache' / 'Local' / 'EdgeHealth'
+    (d / 'logs').mkdir(parents=True)
+    (d / 'config.json').write_text('{"api_url": "https://x.example", "escopo": "usuario"}', encoding='utf-8')
+    (d / 'coletor.token').write_text('ehc_mesma-credencial', encoding='ascii')
+    (d / 'fila.jsonl').write_text('{"id": "a"}\n', encoding='utf-8')
+    (d / 'logs' / 'coletor.log').write_text('antigo\n', encoding='utf-8')
+    (d / 'coletor.pid').write_text('999999', encoding='ascii')
+    return d
+
+
+def created_task_xml(calls):
+    return next(c[-1] for c in calls if c[:2] == ['schtasks', '/Create'])
+
+
+def test_install_redirected_by_a_package_is_found_from_outside(fake_windows):
+    local, _ = fake_windows
+    d = virtual_install(local)
+    assert ew.installed() == ('usuario', d)
+
+
+def test_task_points_to_the_physical_folder(fake_windows, monkeypatch, tmp_path):
+    local, calls = fake_windows
+    seen, real = local / 'EdgeHealth', virtual_install(local)
+    monkeypatch.setattr(ew, 'physical', lambda p: real if Path(p) == seen else Path(p))
+    ew.register_task('usuario', seen)
+    xml = created_task_xml(calls)
+    assert f'--dados "{real}"' in xml and f'--dados "{seen}"' not in xml
+
+
+def test_repair_moves_a_redirected_install_keeping_credential_and_queue(fake_windows):
+    local, calls = fake_windows
+    source = virtual_install(local)
+    target = ew.repair()
+    assert target == local / 'EdgeHealth'
+    assert (target / 'coletor.token').read_text(encoding='ascii') == 'ehc_mesma-credencial'
+    assert (target / 'fila.jsonl').read_text(encoding='utf-8') == '{"id": "a"}\n'
+    assert (target / 'logs' / 'coletor.log').exists() and not (target / 'coletor.pid').exists()
+    assert not source.exists()
+    assert ['taskkill', '/PID', '999999', '/T', '/F'] in calls  # the copy started by hand is ended
+    assert f'--dados "{target}"' in created_task_xml(calls)
+    assert ['schtasks', '/Run', '/TN', ew.TASK] in calls
+
+
+def test_single_instance_lock_follows_the_physical_folder_not_the_task_name(monkeypatch, tmp_path):
+    # The isolated test install collided with the real one because the lock used a fixed name.
+    seen, real, other = tmp_path / 'seen', tmp_path / 'real', tmp_path / 'other'
+    monkeypatch.setattr(ew, 'physical', lambda p: real if Path(p) in (seen, real) else Path(p))
+    assert ew.instance_name('usuario', seen) == ew.instance_name('usuario', real)  # hand-started copy vs task
+    assert ew.instance_name('usuario', other) != ew.instance_name('usuario', real)
+    assert ew.instance_name('maquina', real).startswith('Global\\') and ew.instance_name('usuario', real).startswith('Local\\')
