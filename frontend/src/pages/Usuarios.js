@@ -4,7 +4,7 @@ export async function Usuarios(session) {
   const body=el('div'); let load;
   const editor=(user=null)=>modal(user?'Editar usuário':'Cadastrar usuário',close=>form([
     label('Nome',input('nome','Nome completo',{required:true,maxLength:100,value:user?.nome||''})),
-    label('E-mail',input('email','nome@empresa.com.br',{type:'email',required:true,value:user?.email||''})),
+    label('E-mail',input('email','nome@empresa.com.br',{type:'email',autoComplete:'off',required:true,value:user?.email||''})),
     label(user?'Nova senha (opcional)':'Senha',input('senha','Pelo menos 10 caracteres',{type:'password',required:!user,minLength:10,maxLength:128,autoComplete:'new-password'})),
     label('Permissão',select('papel',[['TECNICO','Técnico'],['ADMIN','Administrador']],user?.papel||'TECNICO')),
     el('p',{className:'muted full'},'A conta será vinculada à sua empresa. Alterações de senha ou permissão encerram as sessões dessa conta.')
