@@ -48,7 +48,7 @@ def login(email, password):
     return user
 
 
-def require_auth(admin=False):
+def require_auth(admin=False, terms=True):
     def decorate(fn):
         @wraps(fn)
         def wrapped(*args, **kwargs):
@@ -57,12 +57,14 @@ def require_auth(admin=False):
             user = db.session.get(Usuario, session.usuario_id) if session else None
             if not session or session.expires_at <= utcnow() or not user or not user.ativo:
                 raise Unauthorized('Sessão expirada. Entre novamente.')
-            if admin and user.papel != 'ADMIN':
-                raise Forbidden('Esta operação exige um administrador da empresa.')
             if request.method not in ('GET', 'HEAD', 'OPTIONS'):
                 csrf = request.headers.get('X-CSRF-Token', '')
                 if not csrf or not secrets.compare_digest(digest(csrf), session.csrf_hash):
                     raise Forbidden('Requisição inválida. Atualize a página e tente novamente.')
+            if terms and user.termos_versao != current_app.config['TERMS_VERSION']:
+                raise Forbidden('Aceite a versão atual dos Termos de Uso para continuar.')
+            if admin and user.papel != 'ADMIN':
+                raise Forbidden('Esta operação exige um administrador da empresa.')
             g.user, g.auth_session = user, session
             return fn(*args, **kwargs)
         return wrapped

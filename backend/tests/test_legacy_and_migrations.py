@@ -4,7 +4,7 @@ import sqlite3
 from pathlib import Path
 
 import pytest
-from flask_migrate import upgrade, check
+from flask_migrate import upgrade, downgrade, check
 from sqlalchemy import select, func, text
 
 from app import create_app, db
@@ -19,6 +19,9 @@ def test_fresh_migrations_and_model_consistency(tmp_path):
         upgrade(directory=migrations)
         upgrade(directory=migrations)  # A second deployment is idempotent.
         check(directory=migrations)
+        downgrade(directory=migrations, revision='7c7ba005affc')  # Empty database: reversible.
+        upgrade(directory=migrations)
+        check(directory=migrations)
         assert db.session.execute(text('PRAGMA foreign_keys')).scalar() == 1
         assert db.session.execute(text('PRAGMA foreign_key_check')).all() == []
         assert db.session.scalar(select(func.count()).select_from(Empresa)) == 0
@@ -28,6 +31,31 @@ def test_fresh_migrations_and_model_consistency(tmp_path):
     with app.app_context():
         assert db.session.scalar(select(func.count()).select_from(Recomendacao)) == 8
     assert app.test_client().get('/api/health').status_code == 200
+
+
+def test_upgrade_from_previous_release_preserves_history(tmp_path):
+    """A database at 7c7ba005affc (first published MVP) upgrades in place without losing rows."""
+    app = create_app({'TESTING': True, 'SQLALCHEMY_DATABASE_URI': 'sqlite:///' + str(tmp_path / 'old.db')})
+    migrations = str(Path(__file__).resolve().parents[1] / 'migrations')
+    with app.app_context():
+        upgrade(directory=migrations, revision='7c7ba005affc')
+        db.session.execute(text("INSERT INTO empresas(id,nome_fantasia,cnpj,criada_em) VALUES (1,'A','11222333000181','2026-09-01')"))
+        db.session.execute(text("INSERT INTO usuarios(id,empresa_id,nome,email,senha_hash,papel,ativo,criada_em) VALUES (1,1,'Adm','a@a.example','x','ADMIN',1,'2026-09-01')"))
+        db.session.execute(text("INSERT INTO dispositivos(id,empresa_id,nome,ip,tipo,localizacao,status,falhas_consecutivas,sucessos_consecutivos,criado_em,proxima_coleta) "
+                                "VALUES (1,1,'R','10.0.0.1','Roteador','TI','OFFLINE',3,0,'2026-09-01','2026-09-01')"))
+        db.session.execute(text("INSERT INTO metricas(id,dispositivo_id,coletada_em,respondeu,pacotes_enviados,pacotes_recebidos,perda_pacotes_pct,status) "
+                                "VALUES (1,1,'2026-09-01 10:00:00',0,4,0,100,'OFFLINE')"))
+        db.session.execute(text("INSERT INTO falhas(id,dispositivo_id,tipo,estado,inicio,ultima_observacao,descricao,severidade,justificativa) "
+                                "VALUES (1,1,'INDISPONIBILIDADE','ABERTA','2026-09-01 10:00:00','2026-09-01 10:00:00','x','MEDIA','{}')"))
+        db.session.commit()
+        upgrade(directory=migrations)
+        check(directory=migrations)
+        assert db.session.execute(text('PRAGMA foreign_key_check')).all() == []
+        metric = db.session.get(Metrica, 1)
+        assert metric.coletor_id is None and metric.fora_de_ordem is False and metric.status == 'OFFLINE'
+        assert db.session.get(Dispositivo, 1).coletor_id is None
+        assert db.session.get(Falha, 1).estado == 'ABERTA'
+        assert db.session.get(Usuario, 1).termos_versao is None  # must accept the terms at next login
 
 
 def test_legacy_preserved_without_fabricated_measurements_or_plaintext_passwords(app, tmp_path):

@@ -28,6 +28,10 @@ class Usuario(db.Model):
     papel = db.Column(db.String(20), nullable=False, default='TECNICO')
     ativo = db.Column(db.Boolean, nullable=False, default=True)
     criada_em = db.Column(db.DateTime, nullable=False, default=utcnow)
+    # Acceptance of the Terms of Use and acknowledgement of the Privacy Notice (not consent).
+    termos_versao = db.Column(db.String(20))
+    termos_aceitos_em = db.Column(db.DateTime)
+    anonimizado_em = db.Column(db.DateTime)
     __table_args__ = (CheckConstraint("papel IN ('ADMIN','TECNICO')", name='papel'),)
 
 class AuthSession(db.Model):
@@ -43,10 +47,31 @@ class LoginAttempt(db.Model):
     key = db.Column(db.String(64), nullable=False, index=True)
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow, index=True)
 
+class Coletor(db.Model):
+    """Remote measurement agent running inside a company network. Never a user."""
+    __tablename__ = 'coletores'
+    id = db.Column(db.Integer, primary_key=True)
+    empresa_id = db.Column(db.Integer, db.ForeignKey('empresas.id', ondelete='RESTRICT'), nullable=False, index=True)
+    nome = db.Column(db.String(100), nullable=False)
+    token_hash = db.Column(db.String(64), nullable=False, unique=True)
+    token_prefixo = db.Column(db.String(12), nullable=False)
+    criado_em = db.Column(db.DateTime, nullable=False, default=utcnow)
+    rotacionado_em = db.Column(db.DateTime)
+    revogado_em = db.Column(db.DateTime)
+    ultimo_contato = db.Column(db.DateTime)
+    versao = db.Column(db.String(30))
+    fila_pendente = db.Column(db.Integer)
+    ultimo_erro = db.Column(db.String(500))
+    ultimo_erro_em = db.Column(db.DateTime)
+    janela_inicio = db.Column(db.DateTime)
+    janela_requisicoes = db.Column(db.Integer, nullable=False, default=0)
+
 class Dispositivo(db.Model):
     __tablename__ = 'dispositivos'
     id = db.Column(db.Integer, primary_key=True)
     empresa_id = db.Column(db.Integer, db.ForeignKey('empresas.id', ondelete='RESTRICT'), nullable=False, index=True)
+    # NULL: measured by the local worker. Otherwise only this remote collector may measure it.
+    coletor_id = db.Column(db.Integer, db.ForeignKey('coletores.id'), index=True)
     nome = db.Column(db.String(100), nullable=False)
     ip = db.Column(db.String(45), nullable=False)
     tipo = db.Column(db.String(50), nullable=False)
@@ -83,8 +108,15 @@ class Metrica(db.Model):
     pacotes_recebidos = db.Column(db.Integer, nullable=False)
     perda_pacotes_pct = db.Column(db.Float, nullable=False)
     status = db.Column(db.String(10), nullable=False)
+    # Remote ingestion metadata. Local worker samples keep these NULL/False.
+    coletor_id = db.Column(db.Integer, db.ForeignKey('coletores.id'))
+    amostra_uid = db.Column(db.String(36))
+    recebida_em = db.Column(db.DateTime)
+    # Older than the device's last processed sample: kept as history, never drives the state machine.
+    fora_de_ordem = db.Column(db.Boolean, nullable=False, default=False, server_default=text('0'))
     __table_args__ = (
         Index('ix_metricas_dispositivo_data', 'dispositivo_id', 'coletada_em'),
+        Index('uq_metrica_coletor_amostra', 'coletor_id', 'amostra_uid', unique=True),
         CheckConstraint('pacotes_enviados > 0 AND pacotes_recebidos >= 0 AND pacotes_recebidos <= pacotes_enviados', name='pacotes'),
         CheckConstraint('perda_pacotes_pct BETWEEN 0 AND 100', name='perda'),
         CheckConstraint('latencia_ms IS NULL OR latencia_ms >= 0', name='latencia'),

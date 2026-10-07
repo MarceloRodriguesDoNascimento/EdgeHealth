@@ -1,4 +1,4 @@
-from flask import g
+from flask import current_app, g
 from sqlalchemy import select, func
 from werkzeug.exceptions import BadRequest, Conflict, NotFound
 from werkzeug.security import generate_password_hash
@@ -24,7 +24,14 @@ def scoped_failure(id):
     return f
 
 
+def accept_terms(user):
+    user.termos_versao=current_app.config['TERMS_VERSION']
+    user.termos_aceitos_em=utcnow()
+
+
 def create_company_account(data):
+    if data.get('aceite_termos') is not True:
+        raise BadRequest('Para criar a conta, aceite os Termos de Uso e declare ciência do Aviso de Privacidade.')
     company=Empresa(nome_fantasia=v.string(data['nome_fantasia'],'Empresa'),cnpj=v.cnpj(data['cnpj']))
     user_email=v.email(data['email'])
     if db.session.scalar(select(Empresa.id).where(Empresa.cnpj==company.cnpj)) or db.session.scalar(select(Usuario.id).where(Usuario.email==user_email)):
@@ -35,6 +42,7 @@ def create_company_account(data):
     db.session.flush()
     user=Usuario(empresa_id=company.id,nome=v.string(data['nome'],'Nome',100),email=user_email,
                  senha_hash=generate_password_hash(v.password(data['senha'])),papel='ADMIN')
+    accept_terms(user)
     db.session.add(user)
     db.session.flush()
     return user
@@ -82,6 +90,14 @@ def save_device(data,id=None):
     if 'ip' in data: device.ip=v.ip(data['ip'])
     if 'tipo' in data: device.tipo=v.string(data['tipo'],'Tipo',50)
     if 'localizacao' in data: device.localizacao=v.string(data['localizacao'],'Localização',150)
+    if 'coletor_id' in data:
+        from .collectors import assignable_collector
+        collector_id=assignable_collector(data['coletor_id'])
+        if collector_id!=device.coletor_id:
+            # A different measurement point: the next cycle collects from the new origin.
+            device.coletor_id=collector_id
+            device.erro_coleta=None
+            device.proxima_coleta=utcnow()
     if id and old_ip!=device.ip:
         current=db.session.scalar(select(Falha).where(Falha.dispositivo_id==id,Falha.estado=='ABERTA'))
         if current: raise Conflict('Encerre a ocorrência por recuperação ou arquive o dispositivo antes de alterar o IP.')

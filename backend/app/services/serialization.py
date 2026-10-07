@@ -1,7 +1,7 @@
 from flask import current_app
 from sqlalchemy import select
 from ..extensions import db
-from ..models import Dispositivo, Diagnostico, DiagnosticoRecomendacao, Impacto, Recomendacao, iso, utcnow
+from ..models import Coletor, Dispositivo,Diagnostico, DiagnosticoRecomendacao, Impacto, Recomendacao, iso, utcnow
 
 
 def company_dict(e):
@@ -9,19 +9,27 @@ def company_dict(e):
 
 
 def user_dict(u):
-    return {k: getattr(u,k) for k in ('id','nome','email','empresa_id','papel','ativo')}
+    result = {k: getattr(u,k) for k in ('id','nome','email','empresa_id','papel','ativo','termos_versao')}
+    result['termos_pendentes'] = u.termos_versao != current_app.config['TERMS_VERSION']
+    return result
 
 
 def device_dict(d):
-    result = {k: getattr(d,k) for k in ('id','empresa_id','nome','ip','tipo','localizacao','status','latencia_ms','perda_pacotes_pct','erro_coleta')}
+    result = {k: getattr(d,k) for k in ('id','empresa_id','nome','ip','tipo','localizacao','status','latencia_ms','perda_pacotes_pct','erro_coleta','coletor_id')}
     result.update(ultima_coleta=iso(d.ultima_coleta), arquivado_em=iso(d.arquivado_em),
                   desatualizado=not d.ultima_coleta or (utcnow()-d.ultima_coleta).total_seconds() > current_app.config['STALE_AFTER_SECONDS'])
+    if d.coletor_id:
+        from .collectors import collector_state
+        collector = db.session.get(Coletor, d.coletor_id)
+        result.update(coletor=collector.nome, coletor_estado=collector_state(collector))
+    else:
+        result.update(coletor=None, coletor_estado=None)
     return result
 
 
 def metric_dict(m):
-    result = {k: getattr(m,k) for k in ('id','dispositivo_id','respondeu','latencia_ms','pacotes_enviados','pacotes_recebidos','perda_pacotes_pct','status')}
-    result['coletada_em'] = iso(m.coletada_em)
+    result = {k: getattr(m,k) for k in ('id','dispositivo_id','respondeu','latencia_ms','pacotes_enviados','pacotes_recebidos','perda_pacotes_pct','status','coletor_id','fora_de_ordem')}
+    result.update(coletada_em=iso(m.coletada_em), recebida_em=iso(m.recebida_em))
     return result
 
 

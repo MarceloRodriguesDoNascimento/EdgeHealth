@@ -4,7 +4,7 @@ from flask import g, request
 from sqlalchemy import select, func
 from werkzeug.exceptions import BadRequest
 from ..extensions import db
-from ..models import Dispositivo, Metrica, Falha, Diagnostico, iso, utcnow
+from ..models import Coletor, Dispositivo,Metrica, Falha, Diagnostico, iso, utcnow
 from .. import validation as v
 from .management import scoped_device
 from .serialization import metric_dict, failure_dict, device_dict
@@ -75,6 +75,9 @@ def dashboard():
         sample_total=db.session.scalar(select(func.count()).select_from(q.subquery()))
         rows=db.session.scalars(q.order_by(Metrica.coletada_em.desc(),Metrica.id.desc()).limit(500)).all()
         series=[metric_dict(m) for m in reversed(rows)]
-    return dict(indicadores=counts,severidades=dict(Counter(f.severidade for f in failures)),
+    from .collectors import collector_state
+    collectors=[dict(id=c.id,nome=c.nome,estado=collector_state(c,now),ultimo_contato=iso(c.ultimo_contato),ultimo_erro=c.ultimo_erro)
+                for c in db.session.scalars(select(Coletor).where(Coletor.empresa_id==g.user.empresa_id,Coletor.revogado_em.is_(None)).order_by(Coletor.nome))]
+    return dict(coletores=collectors,indicadores=counts,severidades=dict(Counter(f.severidade for f in failures)),
                 falhas_recentes=[failure_dict(f) for f in recent],serie=series,serie_total=sample_total,
                 dispositivo_id=device_id,dispositivos=[device_dict(d) for d in devices],atualizado_em=iso(now))
