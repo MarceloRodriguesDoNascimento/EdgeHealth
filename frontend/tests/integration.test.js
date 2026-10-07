@@ -170,7 +170,10 @@ test('interface completa usa a API HTTP e SQLite migrado, sem respostas HTTP sim
   });
 
   await t.test('coletor remoto: cadastro, credencial única, atribuição e revogação pela tela',async()=>{
-    mount(await Coletores());button('Cadastrar coletor').click();
+    mount(await Coletores());
+    const download=[...document.querySelectorAll('a')].find(a=>a.textContent==='Baixar coletor para Windows');
+    assert.equal(download?.getAttribute('href'),'https://github.com/MarceloRodriguesDoNascimento/EdgeHealth/releases/latest/download/EdgeHealthColetor.exe');
+    button('Cadastrar coletor').click();
     await submit({nome:'Coletor da filial'},document.querySelector('dialog'));
     await until(()=>document.querySelector('dialog input[readonly]'),'Credencial não exibida');
     const token=document.querySelector('dialog input[readonly]').value;

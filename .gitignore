@@ -27,3 +27,7 @@ tests/lab/resultados/
 tests/lab/screenshots/
 # Responsive audit output (screenshots, ~9 MB): regenerate with node frontend/tests/support/audit.mjs
 tests/responsivo/
+# Windows collector build (collector/windows/build.ps1): the .exe is published only as a GitHub Release asset
+collector/.venv-build/
+collector/build/
+collector/dist/
