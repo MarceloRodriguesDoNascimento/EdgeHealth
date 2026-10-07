@@ -13,3 +13,6 @@ htmlcov/
 test-results/
 playwright-report/
 *.log
+edgehealth-fila.jsonl
+edgehealth-fila.tmp
+coletor.token
