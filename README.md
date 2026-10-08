@@ -53,7 +53,8 @@ backend/
 │   └── comum/            serialização JSON das entidades e hash de credenciais
 ├── models/               um arquivo por entidade; base.py com o CRUD comum
 ├── repositories/         consultas especiais (SQL) e controle de transação
-├── migrations/           Alembic
+├── database/             create_database.sql (DDL gerado das migrations), gerador e README
+├── migrations/           Alembic (fonte da verdade do esquema)
 └── tests/
 ```
 
@@ -65,6 +66,30 @@ backend/
 | **Repository** (`repositories/`) | Somente consultas especiais: busca limitada à empresa (multiempresa), histórico de falhas com filtros e paginação, métricas por período, agregações do dashboard e ranking de custo (SQL com `text()`), dados do relatório (JOIN e períodos sobrepostos), dispositivos devidos para coleta, lease do dispositivo e grupo de falhas compartilhadas. `Transacao` confirma ou desfaz a transação. | Repetir o CRUD dos models. |
 
 `tests/test_architecture.py` falha se um controller importar `sqlalchemy`/`db`, se um service usar `flask.request`/`flask.g` ou SQL, ou se faltar uma das cinco operações de CRUD na classe base dos models.
+
+### Banco de dados
+
+`backend/database/create_database.sql` cria o banco SQLite completo (tabelas, chaves, `CHECK`, índices parciais, revisão Alembic e catálogo de recomendações). Ele é gerado a partir das migrations, e `tests/test_database_script.py` garante que os dois produzem o mesmo esquema. Detalhes, a justificativa do SQLite e a ausência de Stored Procedures estão em [backend/database/README.md](backend/database/README.md).
+
+### Consultas SQL dos Repositories
+
+`text()` = SQL escrito à mão com parâmetros nomeados. Core = SQLAlchemy Core (`select`/`join`/`where`/`update`/`delete`), que gera SQL parametrizado. Todas as consultas são testadas com resultado esperado exato em `tests/test_repositories.py`.
+
+| Método | O que consulta | SQL |
+| --- | --- | --- |
+| `DashboardRepository.contagem_por_status` | dispositivos ativos por status (`SEM_COLETA` = nunca medido) | `text()`: `COALESCE` + `GROUP BY` |
+| `DashboardRepository.contagem_por_severidade` | falhas abertas da empresa por severidade | `text()`: `JOIN` + `GROUP BY` |
+| `FalhaRepository.ranking_dispositivos` | falhas por dispositivo no período (total, abertas, indisponibilidades) | `text()`: `JOIN` + `GROUP BY` + `ORDER BY` + `LIMIT` |
+| `RankingCustoRepository.top_dispositivos` | top 5 dispositivos por prejuízo estimado (empate: maior id) | `text()`: CTE `VALUES` + `LEFT JOIN` + `ORDER BY` + `LIMIT` |
+| `FalhaRepository.historico` | histórico filtrado por dispositivo, estado, severidade e período, paginado | Core: `JOIN` + `WHERE` + `COUNT` + `LIMIT/OFFSET` |
+| `FalhaRepository.grupo_compartilhado` | indisponibilidades da empresa na janela de correlação | Core: `JOIN` + intervalo |
+| `FalhaRepository.encerradas_desde` / `ids_anteriores_do_dispositivo` | falhas relacionadas e recorrência para o diagnóstico | Core: `JOIN` + intervalo + `LIMIT` |
+| `MetricaRepository.por_periodo` / `serie_do_dispositivo` | amostras por período e série do gráfico | Core: `JOIN` + intervalo + `COUNT` + `LIMIT` |
+| `RelatorioRepository.falhas_sobrepostas` / `metricas` | dados do relatório: falhas que se sobrepõem ao período e amostras | Core: `JOIN` + sobreposição de períodos |
+| `*.buscar_da_empresa` (Dispositivo, Falha, Métrica, Coletor, Usuário, Diagnóstico) | registro por id somente da empresa logada (multiempresa) | Core: `JOIN` até `dispositivos.empresa_id` |
+| `DispositivoRepository.ids_devidos_para_coleta` | dispositivos do worker com coleta vencida, mais antigos primeiro | Core: `WHERE` + `ORDER BY` + `LIMIT` |
+| `DispositivoRepository.reservar_para_worker` / `reservar_para_coletor` | lease exclusivo do dispositivo (só uma requisição consegue) | Core: `UPDATE ... WHERE` atômico |
+| `RetencaoRepository.expurgar` | amostras e registros de segurança vencidos | Core: `COUNT` + `DELETE` |
 
 **Rede privada:** um servidor hospedado na Internet não alcança `192.168.x.x` da empresa. Cada dispositivo tem uma **origem da medição**:
 
