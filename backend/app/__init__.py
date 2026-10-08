@@ -20,7 +20,7 @@ def create_app(config=None):
     db.init_app(app)
     import models  # noqa: F401  (registers every table in the metadata)
     migrate.init_app(app, db, render_as_batch=True)
-    from .api import api
+    from controllers.rotas import api
     from .cli import register_cli
     app.register_blueprint(api)
     register_cli(app)
