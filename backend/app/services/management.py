@@ -4,7 +4,7 @@ from sqlalchemy import select, func
 from werkzeug.exceptions import BadRequest, Conflict, NotFound
 from werkzeug.security import generate_password_hash
 from ..extensions import db
-from ..models import Empresa, Usuario, Dispositivo, Falha, AuthSession, utcnow
+from models import Empresa, Usuario, Dispositivo, Falha, AuthSession, utcnow
 from .. import validation as v
 
 

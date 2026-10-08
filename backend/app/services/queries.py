@@ -4,7 +4,7 @@ from flask import g, request
 from sqlalchemy import select, func
 from werkzeug.exceptions import BadRequest
 from ..extensions import db
-from ..models import Coletor, Dispositivo,Metrica, Falha, Diagnostico, iso, utcnow
+from models import Coletor, Dispositivo,Metrica, Falha, Diagnostico, iso, utcnow
 from .. import validation as v
 from .management import scoped_device
 from .serialization import metric_dict, failure_dict, device_dict
@@ -86,7 +86,7 @@ def dashboard():
 
 def cost_summary(now, days=30):
     """Estimated loss of the incidents started in the last `days` days (shared outages de-duplicated)."""
-    from ..models import Empresa
+    from models import Empresa
     from .costs import total_for
     since=now-timedelta(days=days)
     failures=db.session.scalars(select(Falha).join(Dispositivo).where(Dispositivo.empresa_id==g.user.empresa_id,

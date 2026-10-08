@@ -6,7 +6,7 @@ import os
 import pytest
 from sqlalchemy import select,func
 from app import db
-from app.models import Dispositivo,Metrica,Falha,Diagnostico,Impacto,utcnow
+from models import Dispositivo,Metrica,Falha,Diagnostico,Impacto,utcnow
 from app.services.monitoring import ProbeResult,CollectorError,record_result,real_probe,collect_device,run_cycle
 from app.services.diagnostics import refresh_company
 from conftest import auth_headers

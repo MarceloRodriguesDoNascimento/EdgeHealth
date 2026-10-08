@@ -6,7 +6,7 @@ from datetime import timedelta
 from sqlalchemy import delete, func, select
 from werkzeug.security import generate_password_hash
 from ..extensions import db
-from ..models import AuthSession, Empresa, LoginAttempt, Metrica, Usuario, utcnow
+from models import AuthSession, Empresa, LoginAttempt, Metrica, Usuario, utcnow
 
 
 def purge_history(days, dry_run=False):

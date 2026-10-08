@@ -3,7 +3,7 @@ import sqlite3
 from datetime import timedelta
 from sqlalchemy import select, func
 from app import create_app, db
-from app.models import Dispositivo, Metrica, Empresa, Usuario, Falha, utcnow
+from models import Dispositivo, Metrica, Empresa, Usuario, Falha, utcnow
 from app.services.monitoring import ProbeResult, record_result
 from conftest import auth_headers
 
