@@ -78,8 +78,8 @@ def test_restore_archived_device(signed,device,app):
     with app.app_context():
         d=db.session.get(Dispositivo,id)
         assert d.falhas_consecutivas==0 and d.proxima_coleta<=utcnow()
-    from app.services.monitoring import run_cycle, ProbeResult
-    assert run_cycle(app,lambda *_:ProbeResult(4,4,1))==1  # monitored again
+    from services.monitoramento import ExecutarCicloMonitoramentoService, ProbeResult
+    assert ExecutarCicloMonitoramentoService().executar(app,lambda *_:ProbeResult(4,4,1))==1  # monitored again
 
 
 def test_restore_respects_tenant_ip_and_terms(signed,device,app):

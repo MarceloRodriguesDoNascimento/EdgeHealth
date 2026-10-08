@@ -4,14 +4,14 @@ import zipfile
 from sqlalchemy import select
 from app import db
 from models import Dispositivo,Falha,Diagnostico,utcnow
-from app.services.monitoring import record_result,ProbeResult
+from services.monitoramento import RegistrarMedicaoService, ProbeResult
 from conftest import register,auth_headers
 
 
 def test_cross_tenant_isolation_all_resources(app,signed,device):
     with app.app_context():
         d=db.session.get(Dispositivo,device['id'])
-        metric=record_result(d,ProbeResult(4,3,250))
+        metric=RegistrarMedicaoService().executar(d,ProbeResult(4,3,250))
         db.session.commit()
         mid=metric.id
         fid=db.session.scalar(select(Falha.id))
@@ -36,7 +36,7 @@ def test_cross_tenant_isolation_all_resources(app,signed,device):
 def test_dashboard_history_export_and_recommendations(app,signed,device):
     with app.app_context():
         d=db.session.get(Dispositivo,device['id'])
-        record_result(d,ProbeResult(4,3,210))
+        RegistrarMedicaoService().executar(d,ProbeResult(4,3,210))
         db.session.commit()
     dash=signed.get('/api/dashboard').json
     assert dash['indicadores']['total']==1 and dash['indicadores']['instaveis']==1
