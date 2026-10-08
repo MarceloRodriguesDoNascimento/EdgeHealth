@@ -4,15 +4,15 @@ from datetime import timedelta
 from sqlalchemy import select, func
 from app import create_app, db
 from models import Dispositivo, Metrica, Empresa, Usuario, Falha, utcnow
-from app.services.monitoring import ProbeResult, record_result
+from services.monitoramento import ProbeResult, RegistrarMedicaoService
 from conftest import auth_headers
 
 
 def test_retention_purges_old_samples_but_keeps_incidents(app, device):
     with app.app_context():
         d = db.session.get(Dispositivo, device['id'])
-        record_result(d, ProbeResult(4, 3, 300), utcnow() - timedelta(days=200))
-        record_result(d, ProbeResult(4, 4, 1), utcnow() - timedelta(days=1))
+        RegistrarMedicaoService().executar(d, ProbeResult(4, 3, 300), utcnow() - timedelta(days=200))
+        RegistrarMedicaoService().executar(d, ProbeResult(4, 4, 1), utcnow() - timedelta(days=1))
         db.session.commit()
     runner = app.test_cli_runner()
     preview = runner.invoke(args=['purge-history', '--dry-run'])

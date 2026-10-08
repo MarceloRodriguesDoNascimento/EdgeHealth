@@ -3,7 +3,7 @@ from datetime import timedelta
 from sqlalchemy import select
 from app import db
 from models import Dispositivo,Falha,Diagnostico,Metrica,utcnow
-from app.services.monitoring import ProbeResult,record_result
+from services.monitoramento import ProbeResult, RegistrarMedicaoService
 from conftest import register,auth_headers
 
 def test_every_tenant_boundary_and_csv_content(app,signed,device):
@@ -14,8 +14,8 @@ def test_every_tenant_boundary_and_csv_content(app,signed,device):
     with app.app_context():
         da=db.session.get(Dispositivo,device['id'])
         dbb=db.session.get(Dispositivo,d['id'])
-        record_result(da,ProbeResult(4,3,220))
-        record_result(dbb,ProbeResult(4,3,330))
+        RegistrarMedicaoService().executar(da,ProbeResult(4,3,220))
+        RegistrarMedicaoService().executar(dbb,ProbeResult(4,3,330))
         db.session.commit()
         failure=db.session.scalar(select(Falha).where(Falha.dispositivo_id==dbb.id))
         diag=db.session.scalar(select(Diagnostico).where(Diagnostico.falha_id==failure.id))
@@ -50,7 +50,7 @@ def test_metric_period_order_dashboard_and_csv_injection(app,signed,device):
     with app.app_context():
         d=db.session.get(Dispositivo,device['id'])
         d.nome='=HYPERLINK("malicious")'
-        for hours in [4,3,2]: record_result(d,ProbeResult(4,4,10+hours),utcnow()-timedelta(hours=hours))
+        for hours in [4,3,2]: RegistrarMedicaoService().executar(d,ProbeResult(4,4,10+hours),utcnow()-timedelta(hours=hours))
         db.session.commit()
     result=signed.get('/api/metricas?tipo=latencia&limite=2').json
     assert result['total']==3 and len(result['items'])==2

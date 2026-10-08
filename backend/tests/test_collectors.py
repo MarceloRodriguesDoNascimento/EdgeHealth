@@ -4,7 +4,7 @@ from datetime import timedelta
 from sqlalchemy import select, func
 from app import db
 from models import Coletor, Dispositivo, Metrica, Falha, utcnow
-from app.services.monitoring import ProbeResult, run_cycle
+from services.monitoramento import ProbeResult, ExecutarCicloMonitoramentoService
 from conftest import register, auth_headers
 
 
@@ -172,12 +172,12 @@ def test_collector_problems_are_not_device_failures(app, signed, device):
 def test_local_worker_never_probes_remote_devices(app, signed, device):
     collector, _ = new_collector(signed)
     assign(signed, device['id'], collector['id'])
-    assert run_cycle(app, lambda *_: ProbeResult(4, 4, 1)) == 0
+    assert ExecutarCicloMonitoramentoService().executar(app, lambda *_: ProbeResult(4, 4, 1)) == 0
     with app.app_context():
         assert db.session.scalar(select(func.count()).select_from(Metrica)) == 0
     assert signed.post(f'/api/dispositivos/{device["id"]}/coletas', json={}, headers=auth_headers(signed)).status_code == 202
     assign(signed, device['id'], None)
-    assert run_cycle(app, lambda *_: ProbeResult(4, 4, 1)) == 1
+    assert ExecutarCicloMonitoramentoService().executar(app, lambda *_: ProbeResult(4, 4, 1)) == 1
 
 
 def test_rate_limit_and_concurrent_resend(app, signed, device):

@@ -3,14 +3,14 @@ from pathlib import Path
 import pytest
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from app import create_app, db
-from app.services.catalog import seed_catalog
+from services.diagnosticos.popular_catalogo_service import PopularCatalogoService
 
 @pytest.fixture
 def app(tmp_path):
     app=create_app({'TESTING':True,'SQLALCHEMY_DATABASE_URI':'sqlite:///'+str(tmp_path/'test.db'),'LOGIN_MAX_ATTEMPTS':3})
     with app.app_context():
         db.create_all()
-        seed_catalog()
+        PopularCatalogoService().executar()
         db.session.commit()
     yield app
     with app.app_context(): db.engine.dispose()

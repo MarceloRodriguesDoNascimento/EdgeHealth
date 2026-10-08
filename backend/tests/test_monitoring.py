@@ -7,18 +7,18 @@ import pytest
 from sqlalchemy import select,func
 from app import db
 from models import Dispositivo,Metrica,Falha,Diagnostico,Impacto,utcnow
-from app.services.monitoring import ProbeResult,CollectorError,record_result,real_probe,collect_device,run_cycle
-from app.services.diagnostics import refresh_company
+from services.monitoramento import ProbeResult, CollectorError, RegistrarMedicaoService, SondaIcmpService, ColetarDispositivoService, ExecutarCicloMonitoramentoService
+from services.diagnosticos.atualizar_diagnosticos_service import AtualizarDiagnosticosService
 from conftest import auth_headers
 
 def test_incident_lifecycle_and_metric_contract(app,device):
     with app.app_context():
         d=db.session.get(Dispositivo,device['id'])
         now=utcnow()-timedelta(minutes=2)
-        record_result(d,ProbeResult(4,4,3.2),now)
+        RegistrarMedicaoService().executar(d,ProbeResult(4,4,3.2),now)
         assert d.status=='ONLINE'
         assert not db.session.scalar(select(Falha))
-        for i in range(3): record_result(d,ProbeResult(4,0,None),now+timedelta(seconds=(i+1)*10))
+        for i in range(3): RegistrarMedicaoService().executar(d,ProbeResult(4,0,None),now+timedelta(seconds=(i+1)*10))
         assert d.status=='OFFLINE'
         failure=db.session.scalar(select(Falha))
         assert db.session.scalar(select(func.count()).select_from(Falha))==1
@@ -26,12 +26,12 @@ def test_incident_lifecycle_and_metric_contract(app,device):
         assert failure.severidade=='MEDIA'
         assert db.session.scalar(select(Impacto)).usuarios_afetados is None
         assert db.session.scalar(select(Diagnostico)).estado=='EVIDENCIA_INSUFICIENTE'
-        record_result(d,ProbeResult(4,4,2),now+timedelta(seconds=40))
+        RegistrarMedicaoService().executar(d,ProbeResult(4,4,2),now+timedelta(seconds=40))
         assert d.status=='INSTAVEL' and failure.estado=='ABERTA'
-        record_result(d,ProbeResult(4,4,2),now+timedelta(seconds=50))
+        RegistrarMedicaoService().executar(d,ProbeResult(4,4,2),now+timedelta(seconds=50))
         assert d.status=='ONLINE' and failure.estado=='ENCERRADA'
         assert failure.fim>failure.inicio and failure.encerramento=='RECUPERACAO'
-        record_result(d,ProbeResult(4,3,250),now+timedelta(seconds=60))
+        RegistrarMedicaoService().executar(d,ProbeResult(4,3,250),now+timedelta(seconds=60))
         assert db.session.scalar(select(func.count()).select_from(Falha))==2
         db.session.commit()
         samples=db.session.scalars(select(Metrica).order_by(Metrica.id)).all()
@@ -43,7 +43,7 @@ def test_incident_lifecycle_and_metric_contract(app,device):
 def test_diagnostic_catalog_impact_severity(app,signed,device):
     with app.app_context():
         d=db.session.get(Dispositivo,device['id'])
-        record_result(d,ProbeResult(4,3,300))
+        RegistrarMedicaoService().executar(d,ProbeResult(4,3,300))
         db.session.commit()
         f=db.session.scalar(select(Falha))
         id=f.id
@@ -63,8 +63,8 @@ def test_diagnostic_catalog_impact_severity(app,signed,device):
 def test_time_based_severity_and_archive_preserves_history(app,signed,device):
     with app.app_context():
         d=db.session.get(Dispositivo,device['id'])
-        record_result(d,ProbeResult(4,3,180),utcnow()-timedelta(minutes=20))
-        refresh_company(d.empresa_id)
+        RegistrarMedicaoService().executar(d,ProbeResult(4,3,180),utcnow()-timedelta(minutes=20))
+        AtualizarDiagnosticosService().executar(d.empresa_id)
         db.session.commit()
         f=db.session.scalar(select(Falha))
         assert f.severidade=='ALTA'
@@ -76,23 +76,23 @@ def test_time_based_severity_and_archive_preserves_history(app,signed,device):
     assert signed.get('/api/falhas/'+str(fid)).status_code==200
 
 def test_adapter_uses_measurement_and_bounds_errors(monkeypatch):
-    from app.services import monitoring
+    from services.monitoramento import sonda_icmp_service
     seen={}
     def fake(address,**kwargs):
         seen.update(address=address,**kwargs)
         return SimpleNamespace(packets_sent=4,packets_received=3,avg_rtt=81.25)
-    monkeypatch.setattr(monitoring,'ping',fake)
-    result=real_probe('127.0.0.1',4,0.2)
+    monkeypatch.setattr(sonda_icmp_service,'ping',fake)
+    result=SondaIcmpService().executar('127.0.0.1',4,0.2)
     assert result.loss==25 and result.latency_ms==81.25
     assert seen['privileged'] is False and seen['timeout']==0.2
-    with pytest.raises(CollectorError): real_probe('127.0.0.1;echo injection')
+    with pytest.raises(CollectorError): SondaIcmpService().executar('127.0.0.1;echo injection')
     def timeout(*args,**kwargs): raise OSError('Socket timeout')
-    monkeypatch.setattr(monitoring,'ping',timeout)
-    with pytest.raises(CollectorError): real_probe('127.0.0.1')
+    monkeypatch.setattr(sonda_icmp_service,'ping',timeout)
+    with pytest.raises(CollectorError): SondaIcmpService().executar('127.0.0.1')
 
 def test_scheduler_persists_and_does_not_collect_twice(app,device):
-    assert run_cycle(app,lambda *_:ProbeResult(4,4,0.4))==1
-    assert run_cycle(app,lambda *_:ProbeResult(4,4,0.4))==0
+    assert ExecutarCicloMonitoramentoService().executar(app,lambda *_:ProbeResult(4,4,0.4))==1
+    assert ExecutarCicloMonitoramentoService().executar(app,lambda *_:ProbeResult(4,4,0.4))==0
     with app.app_context():
         d=db.session.get(Dispositivo,device['id'])
         assert d.status=='ONLINE'
@@ -100,7 +100,7 @@ def test_scheduler_persists_and_does_not_collect_twice(app,device):
 
 def test_collector_error_is_not_a_network_failure(app,device):
     def broken(*_): raise CollectorError('Sem permissão ICMP')
-    assert collect_device(app,device['id'],broken) is False
+    assert ColetarDispositivoService().executar(app,device['id'],broken) is False
     with app.app_context():
         d=db.session.get(Dispositivo,device['id'])
         assert d.status is None and d.erro_coleta=='Sem permissão ICMP'
@@ -114,9 +114,9 @@ def test_exclusive_lease(app,device):
         assert release.wait(3)
         return ProbeResult(4,4,1)
     with ThreadPoolExecutor(max_workers=2) as pool:
-        first=pool.submit(collect_device,app,device['id'],slow)
+        first=pool.submit(ColetarDispositivoService().executar,app,device['id'],slow)
         assert entered.wait(3)
-        assert collect_device(app,device['id'],lambda *_:ProbeResult(4,4,1)) is False
+        assert ColetarDispositivoService().executar(app,device['id'],lambda *_:ProbeResult(4,4,1)) is False
         release.set()
         assert first.result()
     with app.app_context(): assert db.session.scalar(select(func.count()).select_from(Metrica))==1
@@ -124,7 +124,7 @@ def test_exclusive_lease(app,device):
 @pytest.mark.real_network
 @pytest.mark.skipif(os.getenv('EDGEHEALTH_TEST_REAL_NETWORK')!='1',reason='Habilite teste ICMP de loopback explicitamente.')
 def test_real_loopback_adapter():
-    result=real_probe('127.0.0.1',2,0.5)
+    result=SondaIcmpService().executar('127.0.0.1',2,0.5)
     assert result.sent==2 and result.received==2
     assert result.latency_ms is not None and result.latency_ms>=0
     assert result.loss==0

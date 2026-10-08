@@ -15,8 +15,8 @@ from flask_migrate import upgrade
 from werkzeug.serving import make_server
 from app import create_app, db
 from models import Dispositivo, utcnow
-from app.services.catalog import seed_catalog
-from app.services.monitoring import ProbeResult, collect_device
+from services.diagnosticos.popular_catalogo_service import PopularCatalogoService
+from services.monitoramento import ProbeResult, ColetarDispositivoService
 
 
 def main():
@@ -25,7 +25,7 @@ def main():
                           'SESSION_COOKIE_SECURE': False, 'LOGIN_MAX_ATTEMPTS': 100})
         with app.app_context():
             upgrade(directory=str(Path(__file__).resolve().parents[1] / 'migrations'))
-            seed_catalog()
+            PopularCatalogoService().executar()
             db.session.commit()
         server = make_server('127.0.0.1', 0, app, threaded=True)
         thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -41,7 +41,7 @@ def main():
                     device.proxima_coleta = utcnow()
                     db.session.commit()
                 result = ProbeResult(command['sent'], command['received'], command['latency_ms'])
-                success = collect_device(app, command['device_id'], lambda *_: result)
+                success = ColetarDispositivoService().executar(app, command['device_id'], lambda *_: result)
                 print(json.dumps({'id': command['id'], 'success': success}), flush=True)
         finally:
             server.shutdown()

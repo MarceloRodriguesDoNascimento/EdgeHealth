@@ -9,7 +9,7 @@ from sqlalchemy import select, func, text
 
 from app import create_app, db
 from models import Empresa, Usuario, Dispositivo, Metrica, Falha, RegistroLegado, Recomendacao
-from app.services.legacy import import_legacy
+from services.legado.importar_legado_service import ImportarLegadoService
 
 
 def test_fresh_migrations_and_model_consistency(tmp_path):
@@ -74,7 +74,7 @@ def test_legacy_preserved_without_fabricated_measurements_or_plaintext_passwords
         old.execute('INSERT INTO metricas VALUES (1,1,12.5)')
     original = hashlib.sha256(source.read_bytes()).hexdigest()
     with app.app_context():
-        report = import_legacy(source)
+        report = ImportarLegadoService().executar(source)
         assert report['empresas'] == report['usuarios'] == report['dispositivos'] == 1
         assert report['registros_preservados'] == 5 and report['quarentena'] == 2
         d = db.session.scalar(select(Dispositivo))
@@ -89,7 +89,7 @@ def test_legacy_preserved_without_fabricated_measurements_or_plaintext_passwords
         metric = db.session.scalar(select(RegistroLegado).where(RegistroLegado.tabela == 'metricas'))
         assert metric.dados['latencia'] == 12.5 and metric.resultado == 'QUARENTENA'
         with pytest.raises(ValueError, match='vazio'):
-            import_legacy(source)
+            ImportarLegadoService().executar(source)
     assert hashlib.sha256(source.read_bytes()).hexdigest() == original
     runner = app.test_cli_runner()
     activation = runner.invoke(args=['activate-user', '--email', 'operator@legacy.example', '--admin'], input='new-secure-password\nnew-secure-password\n')
