@@ -19,7 +19,7 @@ from zoneinfo import ZoneInfo
 from flask import current_app
 from sqlalchemy import select
 from ..extensions import db
-from ..models import Diagnostico, Dispositivo, Empresa, Falha, Impacto, utcnow
+from models import Diagnostico, Dispositivo, Empresa, Falha, Impacto, utcnow
 
 CENT = Decimal('0.01')
 HOUR = Decimal(3600)

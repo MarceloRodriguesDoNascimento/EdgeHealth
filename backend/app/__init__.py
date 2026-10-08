@@ -18,7 +18,7 @@ def create_app(config=None):
         hops = app.config['TRUST_PROXY']
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=hops, x_proto=hops, x_host=hops)
     db.init_app(app)
-    from . import models
+    import models  # noqa: F401  (registers every table in the metadata)
     migrate.init_app(app, db, render_as_batch=True)
     from .api import api
     from .cli import register_cli

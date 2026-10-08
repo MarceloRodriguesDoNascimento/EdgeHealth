@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy import select, func
 from werkzeug.serving import make_server
 from app import db
-from app.models import Metrica, Falha, Dispositivo
+from models import Metrica, Falha, Dispositivo
 from conftest import auth_headers
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'collector'))

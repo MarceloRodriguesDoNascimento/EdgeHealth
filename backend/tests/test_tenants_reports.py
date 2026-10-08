@@ -3,7 +3,7 @@ import io
 import zipfile
 from sqlalchemy import select
 from app import db
-from app.models import Dispositivo,Falha,Diagnostico,utcnow
+from models import Dispositivo,Falha,Diagnostico,utcnow
 from app.services.monitoring import record_result,ProbeResult
 from conftest import register,auth_headers
 

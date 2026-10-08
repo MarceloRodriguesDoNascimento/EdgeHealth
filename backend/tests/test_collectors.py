@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from sqlalchemy import select, func
 from app import db
-from app.models import Coletor, Dispositivo, Metrica, Falha, utcnow
+from models import Coletor, Dispositivo, Metrica, Falha, utcnow
 from app.services.monitoring import ProbeResult, run_cycle
 from conftest import register, auth_headers
 

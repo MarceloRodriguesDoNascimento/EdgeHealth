@@ -10,7 +10,7 @@ import pytest
 from flask_migrate import upgrade, check
 from sqlalchemy import select, text
 from app import create_app, db
-from app.models import Diagnostico, Dispositivo, Empresa, Falha, Impacto, utcnow
+from models import Diagnostico, Dispositivo, Empresa, Falha, Impacto, utcnow
 from app.services import costs
 from conftest import auth_headers, register
 

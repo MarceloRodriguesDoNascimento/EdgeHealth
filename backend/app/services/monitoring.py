@@ -10,7 +10,7 @@ from icmplib import ping
 from icmplib.exceptions import ICMPLibError
 from sqlalchemy import select, update, or_
 from ..extensions import db
-from ..models import Dispositivo, Metrica, Falha, Impacto, utcnow
+from models import Dispositivo, Metrica, Falha, Impacto, utcnow
 from .diagnostics import refresh_company
 
 log=logging.getLogger(__name__)

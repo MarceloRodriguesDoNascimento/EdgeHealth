@@ -6,7 +6,7 @@ from flask import g, request
 from sqlalchemy import select
 from werkzeug.exceptions import UnprocessableEntity
 from ..extensions import db
-from ..models import Dispositivo, Metrica, Falha, Diagnostico, Empresa, iso, utcnow
+from models import Dispositivo, Metrica, Falha, Diagnostico, Empresa, iso, utcnow
 from ..validation import period, query_int
 from .management import scoped_device
 from .queries import date_filter

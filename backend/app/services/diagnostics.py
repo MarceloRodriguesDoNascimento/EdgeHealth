@@ -2,7 +2,7 @@ from datetime import timedelta
 from flask import current_app
 from sqlalchemy import select, delete, func
 from ..extensions import db
-from ..models import Dispositivo, Metrica, Falha, Impacto, Diagnostico, DiagnosticoRecomendacao, Recomendacao, iso, utcnow
+from models import Dispositivo, Metrica, Falha, Impacto, Diagnostico, DiagnosticoRecomendacao, Recomendacao, iso, utcnow
 
 
 def recalculate_severity(failure, related_count, now):

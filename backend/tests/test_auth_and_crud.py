@@ -2,7 +2,7 @@ import pytest
 from sqlalchemy import select,text
 from werkzeug.security import check_password_hash
 from app import db
-from app.models import Usuario,Dispositivo,AuthSession,utcnow
+from models import Usuario,Dispositivo,AuthSession,utcnow
 from conftest import register,auth_headers
 
 

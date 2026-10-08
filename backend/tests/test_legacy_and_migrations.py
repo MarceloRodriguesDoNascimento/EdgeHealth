@@ -8,7 +8,7 @@ from flask_migrate import upgrade, downgrade, check
 from sqlalchemy import select, func, text
 
 from app import create_app, db
-from app.models import Empresa, Usuario, Dispositivo, Metrica, Falha, RegistroLegado, Recomendacao
+from models import Empresa, Usuario, Dispositivo, Metrica, Falha, RegistroLegado, Recomendacao
 from app.services.legacy import import_legacy
 
 

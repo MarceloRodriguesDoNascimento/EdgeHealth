@@ -7,7 +7,7 @@ from sqlalchemy import select
 from werkzeug.exceptions import BadRequest
 from werkzeug.security import generate_password_hash
 from .extensions import db
-from .models import Usuario, AuthSession, RegistroLegado
+from models import Usuario, AuthSession, RegistroLegado
 from .services.catalog import seed_catalog
 from .services.monitoring import run_cycle, validate_monitor_config, real_probe, CollectorError
 

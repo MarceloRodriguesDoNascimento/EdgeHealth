@@ -15,7 +15,7 @@ from werkzeug.security import generate_password_hash
 
 from .. import validation as v
 from ..extensions import db
-from ..models import Empresa, Usuario, Dispositivo, RegistroLegado
+from models import Empresa, Usuario, Dispositivo, RegistroLegado
 
 
 def _json_value(value):
