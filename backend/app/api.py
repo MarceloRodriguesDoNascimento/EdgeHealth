@@ -5,7 +5,7 @@ from alembic.script import ScriptDirectory
 from sqlalchemy import select, text, inspect
 from werkzeug.exceptions import BadRequest, NotFound, Conflict
 from .extensions import db
-from .models import Empresa, Usuario, Dispositivo, Metrica, Falha, Impacto, Diagnostico, Recomendacao, Coletor, utcnow
+from models import Empresa, Usuario, Dispositivo, Metrica, Falha, Impacto, Diagnostico, Recomendacao, Coletor, utcnow
 from . import validation as v
 from .services import management as management
 from .services import collectors as collectors_service

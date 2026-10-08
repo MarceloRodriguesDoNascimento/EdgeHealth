@@ -1,7 +1,7 @@
 from flask import current_app
 from sqlalchemy import select
 from ..extensions import db
-from ..models import Coletor, Dispositivo,Diagnostico, DiagnosticoRecomendacao, Impacto, Recomendacao, iso, utcnow
+from models import Coletor, Dispositivo,Diagnostico, DiagnosticoRecomendacao, Impacto, Recomendacao, iso, utcnow
 
 
 def company_dict(e):

@@ -7,7 +7,7 @@ from sqlalchemy import delete, select, func
 from werkzeug.exceptions import Forbidden, Unauthorized, TooManyRequests
 from werkzeug.security import check_password_hash, generate_password_hash
 from ..extensions import db
-from ..models import AuthSession, LoginAttempt, Usuario, utcnow
+from models import AuthSession, LoginAttempt, Usuario, utcnow
 
 # Equal-cost verification even when an account is absent.
 DUMMY_HASH = generate_password_hash('unused-login-comparison')

@@ -1,6 +1,6 @@
 from sqlalchemy import select
 from ..extensions import db
-from ..models import Recomendacao
+from models import Recomendacao
 
 # These are corrective-action catalog entries, never fabricated network observations.
 CATALOG = [

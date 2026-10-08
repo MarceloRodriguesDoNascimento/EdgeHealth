@@ -14,7 +14,7 @@ from flask import current_app, g, request
 from sqlalchemy import select, update
 from werkzeug.exceptions import BadRequest, Conflict, NotFound, TooManyRequests, Unauthorized
 from ..extensions import db
-from ..models import Coletor, Dispositivo, Metrica, iso, utcnow
+from models import Coletor, Dispositivo, Metrica, iso, utcnow
 from .. import validation as v
 from .auth import digest
 from .monitoring import ProbeResult, CollectorError, claim_device, record_result

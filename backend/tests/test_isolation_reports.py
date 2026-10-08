@@ -2,7 +2,7 @@ import io,json,zipfile
 from datetime import timedelta
 from sqlalchemy import select
 from app import db
-from app.models import Dispositivo,Falha,Diagnostico,Metrica,utcnow
+from models import Dispositivo,Falha,Diagnostico,Metrica,utcnow
 from app.services.monitoring import ProbeResult,record_result
 from conftest import register,auth_headers
 

@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from flask_migrate import upgrade
 from werkzeug.serving import make_server
 from app import create_app, db
-from app.models import Dispositivo, utcnow
+from models import Dispositivo, utcnow
 from app.services.catalog import seed_catalog
 from app.services.monitoring import ProbeResult, collect_device
 
