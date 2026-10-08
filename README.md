@@ -24,14 +24,54 @@ flowchart TD
   WORKER -->|"mesmo pipeline: status, falhas, diagnóstico"| DB
 ```
 
-Backend: Flask, SQLAlchemy e Flask-Migrate/Alembic, com services de autenticação, cadastros, coleta, ingestão remota, regras, consultas, relatórios e privacidade. Frontend: JavaScript em módulos ES, Vite e Chart.js. Coletor: Python, com biblioteca padrão e icmplib. SQLite é o banco validado para uma instância (ver [DEPLOY.md](docs/DEPLOY.md)).
+Backend: Flask, SQLAlchemy e Flask-Migrate/Alembic. Frontend: JavaScript em módulos ES, Vite e Chart.js. Coletor: Python, com biblioteca padrão e icmplib. SQLite é o banco validado para uma instância (ver [DEPLOY.md](docs/DEPLOY.md)).
+
+### API em camadas
+
+Toda funcionalidade segue o mesmo fluxo:
+
+```text
+Tela → API Flask → Controller → Service → Model / Repository → Banco
+```
+
+```text
+backend/
+├── app/                  infraestrutura do Flask (sem regra de negócio)
+│   ├── __init__.py       create_app: configuração, banco, blueprint, erros e cabeçalhos
+│   ├── config.py         variáveis de ambiente
+│   ├── extensions.py     SQLAlchemy e Flask-Migrate
+│   ├── security.py       decorators require_auth / require_collector e cookies de sessão
+│   ├── validation.py     validação de campos (funções puras, usadas pelos services)
+│   └── cli.py            comandos flask (monitor, probe, backup, purge-history...)
+├── controllers/          uma classe por recurso + rotas.py (Blueprint 'api')
+├── services/             uma classe por caso de uso, método executar(), por recurso
+│   ├── autenticacao/  empresas/  usuarios/  dispositivos/  metricas/  falhas/
+│   ├── diagnosticos/  dashboard/  relatorios/  coletores/  coletor_api/
+│   ├── monitoramento/    sonda ICMP, classificação de status, registro de medição, lease
+│   ├── custos/           cálculo do prejuízo estimado (expediente, grupo compartilhado)
+│   ├── privacidade/  legado/  saude/
+│   └── comum/            serialização JSON das entidades e hash de credenciais
+├── models/               um arquivo por entidade; base.py com o CRUD comum
+├── repositories/         consultas especiais (SQL) e controle de transação
+├── migrations/           Alembic
+└── tests/
+```
+
+| Camada | Papel | Não pode |
+| --- | --- | --- |
+| **Controller** (`controllers/`) | Recebe a requisição HTTP, lê o JSON, a query string e o usuário autenticado, chama o service e devolve a resposta (status e JSON). `rotas.py` liga cada URL e método HTTP a um método de controller, com a autenticação exigida. | Ter regra de negócio ou acessar o banco (`sqlalchemy`/`db`). |
+| **Service** (`services/`) | Um caso de uso por classe (`CadastrarDispositivoService`, `RegistrarImpactoService`, `ReceberAmostrasService`...). Valida os dados, aplica as regras e coordena models, repositories e a transação. As regras de domínio também são classes: `RegistrarMedicaoService` (status e ciclo das ocorrências), `AnalisarFalhaService` e `CalcularSeveridadeService` (diagnóstico), `CalculadoraPrejuizo` (custos) e `SondaIcmpService` (integração ICMP). Recebe usuário e empresa como parâmetros. | Ler `flask.request`/`flask.g` ou executar SQL. |
+| **Model** (`models/`) | Mapeamento de cada tabela. Todos herdam `BaseModel`, com `salvar()`, `atualizar()`, `deletar()`, `listar_todos()` e `buscar_por_id()` (`commit=False` mantém a operação na transação do caso de uso). | Conter consultas especiais ou regras de caso de uso. |
+| **Repository** (`repositories/`) | Somente consultas especiais: busca limitada à empresa (multiempresa), histórico de falhas com filtros e paginação, métricas por período, agregações do dashboard e ranking de custo (SQL com `text()`), dados do relatório (JOIN e períodos sobrepostos), dispositivos devidos para coleta, lease do dispositivo e grupo de falhas compartilhadas. `Transacao` confirma ou desfaz a transação. | Repetir o CRUD dos models. |
+
+`tests/test_architecture.py` falha se um controller importar `sqlalchemy`/`db`, se um service usar `flask.request`/`flask.g` ou SQL, ou se faltar uma das cinco operações de CRUD na classe base dos models.
 
 **Rede privada:** um servidor hospedado na Internet não alcança `192.168.x.x` da empresa. Cada dispositivo tem uma **origem da medição**:
 
 - **worker local**, para o que o próprio servidor alcança;
 - **coletor remoto** instalado na rede da empresa ([collector/README.md](collector/README.md)).
 
-O coletor só mede e envia. Status, ocorrências, severidade e diagnóstico são sempre calculados no servidor, pelo mesmo `record_result` usado pelo worker. O worker nunca mede um dispositivo atribuído a um coletor.
+O coletor só mede e envia. Status, ocorrências, severidade e diagnóstico são sempre calculados no servidor, pelo mesmo `RegistrarMedicaoService` usado pelo worker. O worker nunca mede um dispositivo atribuído a um coletor.
 
 ## Pré-requisitos
 
