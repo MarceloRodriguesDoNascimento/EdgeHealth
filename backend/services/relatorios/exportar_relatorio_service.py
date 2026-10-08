@@ -4,7 +4,7 @@ import zipfile
 from werkzeug.exceptions import UnprocessableEntity
 from app import validation as v
 from models import Empresa, iso, utcnow
-from repositories import RelatorioRepository
+from repositories import FalhaRepository, RelatorioRepository
 from services.comum.serializador import Serializador
 from services.custos.calculadora_prejuizo import CalculadoraPrejuizo
 from services.custos.calcular_prejuizo_total_service import CalcularPrejuizoTotalService
@@ -41,6 +41,7 @@ class ExportarRelatorioService:
                         gerado_em=iso(utcnow()), contagens=dict(dispositivos=len(devices), metricas=len(metrics), falhas=len(failures), diagnosticos=len(diagnoses)),
                         prejuizo_estimado=dict(total=costs.get('total'), aviso=CalculadoraPrejuizo.DISCLAIMER if costs['configurado'] else CalculadoraPrejuizo.NOT_CONFIGURED,
                             observacao='Total sem contar duas vezes as pessoas de falhas compartilhadas; a coluna prejuizo_estimado do falhas.csv é a estimativa individual de cada ocorrência (R$, ponto decimal). Falhas abertas: valor parcial até a geração do relatório.'),
+                        falhas_por_dispositivo=FalhaRepository.ranking_dispositivos(empresa_id, start, end, limite=10, dispositivo_id=device_id),
                         observacao='Dispositivos: inventário atual, incluindo arquivados. Falhas: ocorrências sobrepostas ao período. Diagnósticos: última análise disponível das falhas selecionadas. Datas em UTC. Métricas: coletor_id vazio indica worker local; fora_de_ordem=True indica amostra atrasada, mantida no histórico sem alterar estado ou ocorrências.')
         csv = GeradorCsv.gerar
         output = io.BytesIO()

@@ -1,3 +1,4 @@
+from datetime import timedelta
 from app import validation as v
 from models import iso, utcnow
 from repositories import ColetorRepository, DashboardRepository, DispositivoRepository, FalhaRepository, MetricaRepository
@@ -37,4 +38,6 @@ class GerarDashboardService:
         return dict(coletores=collectors, indicadores=counts, severidades=severidades,
                     falhas_recentes=[Serializador.falha(f) for f in recent], serie=series, serie_total=sample_total,
                     dispositivo_id=device_id, dispositivos=[Serializador.dispositivo(d) for d in devices], atualizado_em=iso(now),
-                    custos=ResumirPrejuizoService().executar(empresa_id, now))
+                    custos=ResumirPrejuizoService().executar(empresa_id, now),
+                    # Devices with most incidents overlapping the last 30 days (same window as custos).
+                    falhas_por_dispositivo=FalhaRepository.ranking_dispositivos(empresa_id, now - timedelta(days=30), None, limite=5))
