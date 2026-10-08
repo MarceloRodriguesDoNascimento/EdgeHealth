@@ -1,24 +1,9 @@
+"""Field validation used by the services. Pure functions: no access to the HTTP request."""
 import ipaddress
 import re
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
-from flask import request
 from werkzeug.exceptions import BadRequest
-
-
-def payload(allowed, required=()):
-    if not request.is_json:
-        raise BadRequest('Envie um objeto JSON.')
-    data = request.get_json()
-    if not isinstance(data, dict):
-        raise BadRequest('Envie um objeto JSON.')
-    unknown = set(data) - set(allowed)
-    if unknown:
-        raise BadRequest('Campos não permitidos: ' + ', '.join(sorted(unknown)))
-    for field in required:
-        if field not in data or data[field] is None or data[field] == '':
-            raise BadRequest(f'O campo {field} é obrigatório.')
-    return data
 
 
 def string(value, field, maximum=150, minimum=1):
@@ -115,8 +100,8 @@ def timezone_name(value):
     return value.strip()
 
 
-def query_int(name, default=None, low=1, high=2147483647):
-    raw = request.args.get(name)
+def query_int(raw, name, default=None, low=1, high=2147483647):
+    """Integer received as query-string text; empty or absent means `default`."""
     if raw is None or raw == '':
         return default
     try:
@@ -126,7 +111,8 @@ def query_int(name, default=None, low=1, high=2147483647):
     return integer(result, name, low, high)
 
 
-def period(default_days=None):
+def period(start_raw, end_raw, default_days=None):
+    """[start, end) in naive UTC from ISO 8601 query-string texts (a date-only end includes that day)."""
     def parse(raw, end=False):
         if not raw:
             return None
@@ -139,8 +125,8 @@ def period(default_days=None):
             return value
         except ValueError:
             raise BadRequest('Período inválido. Use datas ISO 8601.')
-    start = parse(request.args.get('inicio'))
-    end = parse(request.args.get('fim'), True)
+    start = parse(start_raw)
+    end = parse(end_raw, True)
     if not start and default_days:
         start = (end or datetime.now(timezone.utc).replace(tzinfo=None)) - timedelta(days=default_days)
     if start and end and start >= end:

@@ -11,7 +11,7 @@ from flask_migrate import upgrade, check
 from sqlalchemy import select, text
 from app import create_app, db
 from models import Diagnostico, Dispositivo, Empresa, Falha, Impacto, utcnow
-from app.services import costs
+from services.custos import CalculadoraPrejuizo, CalcularPrejuizoTotalService, EstimarPrejuizoFalhaService
 from conftest import auth_headers, register
 
 # 2026-10-07 is a Wednesday; São Paulo is UTC-3 all year (no DST since 2019). Working hours 08-18 local
@@ -53,7 +53,7 @@ def new_device(client, name, ip, tipo='Servidor', **extra):
 
 def estimate(app, failure_id, now=None):
     with app.app_context():
-        return costs.full_estimate(db.session.get(Falha, failure_id), now=now)
+        return EstimarPrejuizoFalhaService().executar(db.session.get(Falha, failure_id), agora=now)
 
 
 def test_cost_per_hour_is_computed_from_salary_charges_and_hours(configured):
@@ -70,7 +70,7 @@ def test_incident_entirely_inside_working_hours(app, configured, device):
     assert e['valor'] == '1409.09' and e['em_andamento'] is False
     assert e['detalhe']['horas_expediente'] == '2.00' and e['detalhe']['custo_hora'] == '23.18'
     assert e['conta'] == '25 pessoas × R$ 23,18/h × 100% × 2,0 h de expediente + R$ 250,00 de custos diretos'
-    assert e['aviso'] == costs.DISCLAIMER
+    assert e['aviso'] == CalculadoraPrejuizo.DISCLAIMER
 
 
 def test_only_the_part_inside_working_hours_counts(app, configured, device):
@@ -110,7 +110,7 @@ def test_shared_outage_group_does_not_count_the_same_people_twice(app, configure
     assert 'não a soma' in g['explicacao']
     with app.app_context():
         company = db.session.get(Empresa, devices[0]['empresa_id'])
-        total = costs.total_for(db.session.scalars(select(Falha)).all(), company)
+        total = CalcularPrejuizoTotalService().executar(db.session.scalars(select(Falha)).all(), company)
     assert total['total'] == '579.55'  # sum of the individual estimates would be 927.27
     assert [t['nome'] for t in total['top_dispositivos']] == ['Andar 1', 'Andar 2', 'Andar 3']
 
@@ -118,7 +118,7 @@ def test_shared_outage_group_does_not_count_the_same_people_twice(app, configure
 def test_without_company_costs_nothing_is_invented(app, signed, device):
     fid = make_failure(app, device['id'], WED.replace(hour=13), WED.replace(hour=15), users=25, loss=100)
     e = estimate(app, fid)
-    assert e == {'configurado': False, 'mensagem': costs.NOT_CONFIGURED}
+    assert e == {'configurado': False, 'mensagem': CalculadoraPrejuizo.NOT_CONFIGURED}
     detail = signed.get(f'/api/falhas/{fid}').json
     assert detail['prejuizo']['configurado'] is False
     assert signed.get('/api/dashboard').json['custos']['configurado'] is False
@@ -256,4 +256,4 @@ def test_upgrade_from_production_revision_keeps_data(tmp_path):
         assert (company.expediente_dias, company.expediente_inicio, company.expediente_fim, company.fuso) == ('12345', '08:00', '18:00', 'America/Sao_Paulo')
         assert db.session.get(Impacto, 1).usuarios_afetados == 7 and db.session.get(Impacto, 1).custos_diretos is None
         assert db.session.get(Dispositivo, 1).usuarios_dependentes is None
-        assert costs.full_estimate(db.session.get(Falha, 1))['configurado'] is False
+        assert EstimarPrejuizoFalhaService().executar(db.session.get(Falha, 1))['configurado'] is False
