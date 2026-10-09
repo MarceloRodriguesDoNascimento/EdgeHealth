@@ -4,6 +4,7 @@ from repositories import DiagnosticoRepository, DispositivoRepository
 from services.coletores.estado_coletor import EstadoColetor
 from services.custos.calculadora_prejuizo import CalculadoraPrejuizo
 from services.custos.estimar_prejuizo_falha_service import EstimarPrejuizoFalhaService
+from services.ia.gemini_service import GeminiService
 
 
 class Serializador:
@@ -69,6 +70,7 @@ class Serializador:
         if detalhe:
             result['diagnostico'] = cls.diagnostico(Diagnostico.buscar_um_por(falha_id=f.id))
             result['prejuizo'] = EstimarPrejuizoFalhaService().executar(f)
+            result['ia_disponivel'] = GeminiService.disponivel()
         return result
 
     @staticmethod

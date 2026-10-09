@@ -91,3 +91,29 @@ test('failed confirmation keeps the dialog usable and displays the API error',as
   assert.ok(document.querySelector('dialog'));
   assert.match(document.querySelector('#notifications').textContent,/Coleta em andamento/);
 });
+
+test('AI explanation: disabled without AI; with AI shows paragraphs and the warning; errors are announced',async()=>{
+  const {aiPanel}=await import('../src/pages/Falha.js');
+  const off=aiPanel({ia_disponivel:false},async()=>{throw new Error('não deveria chamar');});
+  document.body.append(off);
+  const offButton=[...off.querySelectorAll('button')].find(b=>b.textContent==='Explicar com IA');
+  assert.equal(offButton.disabled,true);
+  assert.match(off.textContent,/IA não configurada neste servidor/);
+  let release;
+  const on=aiPanel({ia_disponivel:true},()=>new Promise(r=>{release=r;}));
+  document.body.append(on);
+  const onButton=[...on.querySelectorAll('button')].find(b=>b.textContent==='Explicar com IA');
+  assert.equal(onButton.disabled,false);
+  onButton.click();
+  assert.equal(onButton.disabled,true);assert.equal(onButton.textContent,'Gerando explicação…');
+  release({texto:'O que aconteceu: o roteador parou.\n\nPróximos passos: verificar o cabo.',aviso:'Texto gerado por IA a partir do diagnóstico do sistema; confira antes de agir.'});
+  await new Promise(r=>setTimeout(r,0));
+  const paragraphs=[...on.querySelectorAll('.ai-output p')].map(p=>p.textContent);
+  assert.deepEqual(paragraphs,['O que aconteceu: o roteador parou.','Próximos passos: verificar o cabo.','Texto gerado por IA a partir do diagnóstico do sistema; confira antes de agir.']);
+  assert.equal(onButton.disabled,false);
+  const failing=aiPanel({ia_disponivel:true},async()=>{throw new Error('A cota gratuita da IA foi atingida. Tente novamente mais tarde.');});
+  document.body.append(failing);
+  [...failing.querySelectorAll('button')].find(b=>b.textContent==='Explicar com IA').click();
+  await new Promise(r=>setTimeout(r,0));
+  assert.match(failing.querySelector('[role=alert]').textContent,/cota gratuita/);
+});

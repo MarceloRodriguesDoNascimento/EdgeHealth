@@ -31,7 +31,7 @@ export async function Falha(id){
     root.replaceChildren(el('a',{href:'#historico',className:'text-link'},'← Voltar ao histórico'),pageHeader(`Ocorrência #${f.id}`,`${f.dispositivo} · ${f.ip}`,button('Atualizar',()=>load().catch(e=>toast(e.message,true)))),
       el('div',{className:'actions'},badge(f.estado,f.estado==='ABERTA'?'INSTAVEL':'ONLINE'),badge(f.tipo,'SEM_COLETA')),
       el('div',{className:'detail-grid'},el('div',{className:'panel'},el('h2',{},f.dispositivo),el('p',{},f.descricao),timeline),severity),
-      lossPanel(f.prejuizo),analysis,recs,el('div',{className:'panel'},el('h2',{},'Impacto operacional'),el('p',{className:'muted'},f.impacto?.origem==='INFORMADO_PELO_USUARIO'?'Estimativa informada pela equipe. A duração é calculada automaticamente.':'Usuários afetados ainda não informados. A duração é calculada automaticamente.'),impact),evidence);
+      lossPanel(f.prejuizo),aiPanel(f,()=>apiFetch(`/falhas/${id}/explicacao-ia`,{method:'POST',body:'{}'})),analysis,recs,el('div',{className:'panel'},el('h2',{},'Impacto operacional'),el('p',{className:'muted'},f.impacto?.origem==='INFORMADO_PELO_USUARIO'?'Estimativa informada pela equipe. A duração é calculada automaticamente.':'Usuários afetados ainda não informados. A duração é calculada automaticamente.'),impact),evidence);
   };
   await load();return root;
 }
@@ -50,4 +50,30 @@ export function lossPanel(p){
   if(p.grupo)root.append(el('div',{className:'loss-group'},el('strong',{},`Total do grupo compartilhado: ${brl(p.grupo.valor)}`),el('p',{className:'small'},p.grupo.explicacao)));
   root.append(el('p',{className:'muted small'},p.aviso));
   return root;
+}
+
+// Plain-language explanation by the AI (Gemini) from the diagnosis the system already computed.
+// `explain` returns the API answer; injected so the panel can be tested without the network.
+export function aiPanel(f,explain){
+  const available=Boolean(f.ia_disponivel);
+  const output=el('div',{className:'ai-output','aria-live':'polite'});
+  const trigger=button('Explicar com IA',async()=>{
+    trigger.disabled=true;trigger.textContent='Gerando explicação…';output.setAttribute('aria-busy','true');
+    output.replaceChildren(el('p',{className:'muted small'},'A IA está lendo o diagnóstico desta ocorrência…'));
+    try{
+      const r=await explain();
+      output.replaceChildren(...r.texto.split(/\n+/).map(p=>p.trim()).filter(Boolean).map(p=>el('p',{},p)),
+        el('p',{className:'ai-warning small'},r.aviso));
+    }catch(e){
+      output.replaceChildren(el('p',{className:'error-text',role:'alert'},e.message));
+    }finally{
+      trigger.disabled=false;trigger.textContent='Explicar com IA';output.removeAttribute('aria-busy');
+    }
+  },'secondary',{disabled:!available,title:available?'':'IA não configurada neste servidor','aria-describedby':'ai-hint'});
+  return el('div',{className:'panel ai-panel'},
+    el('div',{className:'section-heading'},el('h2',{},'Explicação com IA'),trigger),
+    el('p',{className:'muted small',id:'ai-hint'},available
+      ?'Gera um resumo em linguagem simples para gestores: o que aconteceu, o impacto provável e os próximos passos. Envia à IA somente dados técnicos da ocorrência, nunca nomes, e-mails, CNPJ ou IP.'
+      :'IA não configurada neste servidor.'),
+    output);
 }

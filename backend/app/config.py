@@ -39,6 +39,11 @@ class Config:
     COLLECTOR_MAX_CONTENT_LENGTH = 512 * 1024
     # Privacy and operations.
     TERMS_VERSION = os.getenv('TERMS_VERSION', '2026-10')
+    # Optional generative AI (Gemini): plain-language explanation of an incident. No key = disabled.
+    GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '').strip()
+    GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-3.8-flash').strip()
+    GEMINI_TIMEOUT_SECONDS = float(os.getenv('GEMINI_TIMEOUT_SECONDS', '20'))
+    IA_EXPLICACOES_POR_HORA = int(os.getenv('IA_EXPLICACOES_POR_HORA', '10'))
     METRIC_RETENTION_DAYS = int(os.getenv('METRIC_RETENTION_DAYS', '180'))
     TRUST_PROXY = int(os.getenv('TRUST_PROXY', '0'))
     FRONTEND_DIST =str(Path(__file__).resolve().parents[2] / 'frontend' / 'dist')

@@ -251,6 +251,15 @@ Severidade usa o maior nível aplicável, com thresholds centralizados em `app/c
 
 O diagnóstico considera até 20 amostras recentes, pares da mesma empresa com observação recente e até 20 ocorrências anteriores dos últimos sete dias. Regras: problema localizado, interrupção possivelmente compartilhada, congestionamento/instabilidade, latência e recorrência. Causas são hipóteses; topologia não é presumida. Sem evidência, informa insuficiência. Evidências, versão, momento e recomendações são persistidos. A recuperação conserva a última explicação da anomalia no histórico.
 
+## Explicar ocorrência com IA (opcional)
+
+Na tela da ocorrência, **Explicar com IA** gera, em português simples para um gestor, o que aconteceu, o impacto provável e os próximos passos, a partir do diagnóstico e das recomendações que o sistema já calculou. A IA explica; o diagnóstico por regras não muda.
+
+- Fluxo: `Falha.js` → `POST /api/falhas/<id>/explicacao-ia` → `FalhaController.explicar_com_ia` → `ExplicarFalhaComIaService` → `GeminiService` (única classe que conversa com a API do Gemini). Fluxograma 6 em [`docs/fluxogramas.md`](docs/fluxogramas.md).
+- Configuração no `backend/.env` (nunca no Git): `GEMINI_API_KEY` (sem ela o botão aparece desabilitado), `GEMINI_MODEL` (padrão `gemini-3.8-flash`) e `IA_EXPLICACOES_POR_HORA` (padrão 10 por empresa).
+- Privacidade: só dados técnicos são enviados, nunca nomes, e-mails, CNPJ, nome da empresa ou IP ([`docs/LGPD.md`](docs/LGPD.md), seção 6).
+- Erros: sem chave **503**; cota, rede ou timeout de 20 s **503**; chave inválida ou resposta vazia **502**; limite por empresa **429**.
+
 ## Dashboard e relatórios
 
 Métricas são paginadas, cronológicas e filtráveis por dispositivo/período/tipo. Histórico filtra dispositivo, período, severidade e estado. Filtros usam UTC; `fim` com apenas data inclui o dia inteiro. Se somente `fim` for informado, o início padrão é relativo a ele.
