@@ -11,7 +11,7 @@ Fontes oficiais consultadas: [Lei nº 13.709/2018](https://www.planalto.gov.br/c
 | Controlador dos dados das contas e da operação da plataforma | [responsável pela operação do EdgeHealth — a definir] | Define finalidades e meios do serviço hospedado. |
 | Empresa cliente | Cada empresa cadastrada | Decide quais equipamentos e pessoas cadastra. Pode atuar como controladora dos dados que insere (ex.: nomes de colaboradores, localização de equipamentos). A relação exata deve ser definida nos termos firmados. |
 | Encarregado (DPO) | [a definir] | Canal de contato: [a definir]. |
-| Provedores (operadores) | [hospedagem ainda não escolhida] | Registrar aqui somente provedores efetivamente contratados (seção 6). |
+| Provedores (operadores) | PythonAnywhere (hospedagem) e Google (Gemini API, somente se a IA estiver configurada) | Ver seção 6. |
 
 ## 2. Inventário de dados tratados (o que o código realmente armazena)
 
@@ -75,7 +75,18 @@ Credenciais expostas no histórico Git devem ser revogadas e rotacionadas. O his
 
 | Provedor | Serviço | Localização dos dados | Contrato/termos |
 |---|---|---|---|
-| — | Nenhum provedor de hospedagem contratado até esta revisão | — | — |
+| PythonAnywhere (Anaconda) | Hospedagem da aplicação e do banco SQLite (plano gratuito, demonstração acadêmica) | Servidores do PythonAnywhere fora do Brasil | Termos de uso do PythonAnywhere |
+| Google (Gemini API) | "Explicar ocorrência com IA" (opcional; só funciona com `GEMINI_API_KEY` configurada) | Infraestrutura do Google, fora do Brasil | Termos da Gemini API |
+
+### Gemini API: o que é enviado e o que nunca é enviado
+
+- **Finalidade:** gerar, a pedido de um usuário autenticado, uma explicação em linguagem simples de **uma** ocorrência, a partir do diagnóstico e das recomendações que o próprio sistema já calculou. A IA não decide nada: o diagnóstico por regras não é alterado.
+- **Quando:** somente quando alguém clica em "Explicar com IA" numa ocorrência. Nenhum envio automático, em lote ou de histórico.
+- **Dados enviados (lista fechada, montada em `ExplicarFalhaComIaService.contexto`):** tipo, situação e severidade da ocorrência; motivos da severidade; início, fim e duração; tipo e localização do dispositivo; quantidade de usuários afetados (só o número); causas prováveis e recomendações do diagnóstico; prejuízo estimado e a conta usada.
+- **Nunca enviados:** nomes de pessoas, e-mails, CNPJ, nome da empresa, nome do dispositivo, endereço IP, observações em texto livre, credenciais e cookies. `backend/tests/test_ia.py` falha se algum desses dados aparecer no texto enviado.
+- **Recomendação ao cliente:** não cadastrar nomes de pessoas no campo "Localização" dos dispositivos (ex.: use "Recepção", não "Mesa da Maria"), porque esse campo é enviado.
+- **Retenção no EdgeHealth:** a explicação não é gravada no banco; aparece só na tela de quem pediu. A chave fica apenas no `.env` do servidor (fora do Git) e vai no cabeçalho da requisição, nunca em URL ou log.
+- **Atenção:** nos serviços gratuitos da Gemini API, o Google pode usar o conteúdo recebido para melhorar seus produtos. Por isso só dados técnicos são enviados. Para uso em produção com clientes reais, avaliar um plano pago e o contrato de tratamento de dados.
 
 Preencha ao contratar hospedagem, backup externo ou e-mail. Avalie a transferência internacional (arts. 33 a 36) se os servidores estiverem fora do Brasil.
 
@@ -85,6 +96,7 @@ Preencha ao contratar hospedagem, backup externo ou e-mail. Avalie a transferên
 - [ ] Revisar as bases legais sugeridas e as minutas em `frontend/public/termos.html` e `frontend/public/privacidade.html`.
 - [ ] Definir a retenção de logs e backups no provedor escolhido.
 - [ ] Registrar os provedores contratados.
+- [ ] Citar o uso opcional da Gemini API (Google) no Aviso de Privacidade (`frontend/public/privacidade.html`) antes de habilitar a IA para clientes reais.
 - [ ] Agendar `purge-history` e backups no ambiente hospedado.
 
 Ao alterar os Termos, aumente `TERMS_VERSION`: cada usuário aceitará a nova versão no próximo acesso.

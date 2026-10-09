@@ -1,6 +1,6 @@
 # Fluxogramas dos casos de uso
 
-Cinco casos de uso principais, passo a passo pelas camadas da API, com os **nomes reais** das classes e métodos
+Seis casos de uso principais, passo a passo pelas camadas da API, com os **nomes reais** das classes e métodos
 (`backend/tests/test_flowcharts.py` falha se algum Controller, Service ou Repository citado deixar de existir).
 Imagens para slides em [`docs/img/`](img/).
 
@@ -231,6 +231,48 @@ flowchart TD
     R7 --> B
     B --> OK["200 + indicadores, severidades, recentes, série,<br/>coletores, custos (total e top 5)"]:::tela
     OK --> T2["Dashboard.js: cartões, gráficos de latência e perda,<br/>Custo estimado das falhas (30 dias)"]:::tela
+    classDef tela fill:#e3f2fd,stroke:#1e88e5,color:#0d2b45
+    classDef ctrl fill:#ede7f6,stroke:#5e35b1,color:#1f1147
+    classDef svc fill:#e8f5e9,stroke:#2e7d32,color:#0f2e12
+    classDef model fill:#fff8e1,stroke:#f9a825,color:#3d2c00
+    classDef repo fill:#fce4ec,stroke:#c2185b,color:#45091f
+    classDef banco fill:#eceff1,stroke:#455a64,color:#1c262b
+    classDef erro fill:#ffebee,stroke:#c62828,color:#5a0d0d
+```
+
+---
+
+## 6. Recuperação de dados com IA: explicar ocorrência com IA
+
+**Objetivo:** gerar, em português simples para um gestor não técnico, o que aconteceu, o impacto provável e os
+próximos passos, a partir do diagnóstico e das recomendações que o sistema já calculou. A IA **explica**; ela não
+substitui nem altera o diagnóstico por regras. **Ator:** administrador ou técnico. **Tela:**
+`frontend/src/pages/Falha.js` → card "Explicação com IA" → "Explicar com IA".
+
+Imagem para slides: [SVG](img/fluxo-6-explicar-com-ia.svg) · [PNG](img/fluxo-6-explicar-com-ia.png)
+
+```mermaid
+flowchart TD
+    T["Falha.js: botão Explicar com IA<br/>(desabilitado se ia_disponivel = false)"]:::tela -->|"POST /api/falhas/{id}/explicacao-ia"| C["FalhaController.explicar_com_ia"]:::ctrl
+    C --> O["ObterFalhaService.buscar"]:::svc
+    O --> R1["FalhaRepository.buscar_da_empresa"]:::repo
+    R1 -->|"ocorrência de outra empresa"| E404["404"]:::erro
+    R1 --> P["payload vazio"]:::ctrl
+    P -->|"campo extra no pedido"| E400["400"]:::erro
+    P --> S["ExplicarFalhaComIaService.executar"]:::svc
+    S -->|"GEMINI_API_KEY não configurada"| E503a["503 IA não configurada neste servidor"]:::erro
+    S --> L["LimiteUsoIa.registrar<br/>limite por empresa por hora"]:::svc
+    L -->|"limite atingido"| E429["429"]:::erro
+    L --> CT["ExplicarFalhaComIaService.contexto<br/>somente dados técnicos (lista de permitidos)"]:::svc
+    CT --> M["Dispositivo.buscar_por_id, Impacto.buscar_um_por,<br/>Diagnostico.buscar_um_por: tipo, localização,<br/>horários, severidade, causas e recomendações"]:::model
+    CT --> PR["EstimarPrejuizoFalhaService.executar<br/>prejuízo estimado"]:::svc
+    M --> B[("falhas, dispositivos, impactos,<br/>diagnosticos, recomendacoes")]:::banco
+    CT --> G["GeminiService.executar<br/>única classe que fala com a API do Gemini<br/>chave no cabeçalho, timeout de 20 s"]:::svc
+    G -->|"HTTPS generateContent"| API[("Gemini API (Google)")]:::banco
+    API -->|"cota esgotada, rede ou timeout"| E503b["503 com mensagem clara"]:::erro
+    API -->|"chave inválida ou resposta vazia"| E502["502"]:::erro
+    API --> OK["200 + texto, modelo, gerado_em e aviso"]:::tela
+    OK --> T2["Falha.js: parágrafos e o aviso<br/>Texto gerado por IA a partir do diagnóstico do sistema;<br/>confira antes de agir"]:::tela
     classDef tela fill:#e3f2fd,stroke:#1e88e5,color:#0d2b45
     classDef ctrl fill:#ede7f6,stroke:#5e35b1,color:#1f1147
     classDef svc fill:#e8f5e9,stroke:#2e7d32,color:#0f2e12

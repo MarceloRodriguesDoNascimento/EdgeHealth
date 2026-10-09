@@ -26,10 +26,11 @@ def flowchart_references():
     return blocks, {(m.group(1), m.group(2)) for block in blocks for m in LAYER.finditer(block)}
 
 
-def test_five_flowcharts_cover_input_and_retrieval():
+def test_six_flowcharts_cover_input_retrieval_and_ai():
     blocks, _ = flowchart_references()
     headings = re.findall(r'^## \d\. (Entrada|Recuperação) de dados', FLOWCHARTS.read_text(encoding='utf-8'), re.M)
-    assert len(blocks) == 6  # legend + 5 use cases
+    assert len(blocks) == 7  # legend + 6 use cases
+    assert 'GeminiService.executar' in blocks[6], 'o caso de uso de IA deve passar pelo GeminiService'
     assert headings.count('Entrada') >= 2 and headings.count('Recuperação') >= 2
     for block in blocks[1:]:
         assert 'Controller.' in block and 'Service' in block and 'Repository.' in block, 'fluxo sem passar por todas as camadas'
