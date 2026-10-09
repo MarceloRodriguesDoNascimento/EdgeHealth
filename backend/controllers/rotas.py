@@ -68,6 +68,7 @@ ROTAS = [
     ('/falhas', 'GET', 'failures', sessao, falha.listar),
     ('/falhas/<int:id>', 'GET', 'failure', sessao, falha.obter),
     ('/falhas/<int:id>/impacto', 'PUT', 'update_impact', sessao, falha.registrar_impacto),
+    ('/falhas/<int:id>/explicacao-ia', 'POST', 'explain_failure_with_ai', sessao, falha.explicar_com_ia),
 
     ('/diagnosticos/<int:id>', 'GET', 'diagnostic', sessao, diagnostico.obter),
     ('/recomendacoes', 'GET', 'recommendations', sessao, diagnostico.listar_recomendacoes),

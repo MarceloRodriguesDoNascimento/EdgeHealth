@@ -1,3 +1,4 @@
+from services.falhas.explicar_falha_com_ia_service import ExplicarFalhaComIaService
 from services.falhas.listar_falhas_service import ListarFalhasService
 from services.falhas.obter_falha_service import ObterFalhaService
 from services.falhas.registrar_impacto_service import RegistrarImpactoService
@@ -19,3 +20,8 @@ class FalhaController(BaseController):
         falha = ObterFalhaService().buscar(self.empresa_id(), id)  # 404 comes before payload errors
         dados = self.payload(['usuarios_afetados', 'observacao', 'custos_diretos'])
         return self.resposta(RegistrarImpactoService().executar(self.empresa_id(), falha, dados))
+
+    def explicar_com_ia(self, id):
+        falha = ObterFalhaService().buscar(self.empresa_id(), id)  # 404 for another company's incident
+        self.payload([])
+        return self.resposta(ExplicarFalhaComIaService().executar(self.empresa_id(), falha))
