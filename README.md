@@ -28,6 +28,11 @@ Backend: Flask, SQLAlchemy e Flask-Migrate/Alembic. Frontend: JavaScript em mód
 
 ### API em camadas
 
+**Diagramas:**
+
+- **Diagrama de classes do domínio:** [`docs/diagrama-classes.md`](docs/diagrama-classes.md) (imagem: [`docs/img/diagrama-classes.svg`](docs/img/diagrama-classes.svg)). É gerado a partir dos Models por `docs/gerar_diagrama_classes.py`, e `backend/tests/test_diagram.py` garante que ele corresponde ao código.
+- **Fluxogramas dos casos de uso:** [`docs/fluxogramas.md`](docs/fluxogramas.md), com 5 casos de uso (3 de entrada e 2 de recuperação de dados) passando por Tela → Controller → Service → Model/Repository → Banco (imagens em [`docs/img/`](docs/img/)). `backend/tests/test_flowcharts.py` garante que toda classe e método citados existem.
+
 Toda funcionalidade segue o mesmo fluxo:
 
 ```text
