@@ -1,0 +1,277 @@
+# Arquivos da implementação
+
+## Etapa de 06/10/2026 (coletor remoto, hospedagem e privacidade), sobre `4320fb6`
+
+**Criados:**
+
+- Raiz: `.dockerignore`, `.gitattributes`, `Dockerfile`, `docker-compose.yml`.
+- Backend: `backend/docker-entrypoint.sh`, `backend/app/services/collectors.py`, `backend/app/services/privacy.py`, `backend/migrations/versions/bc4dfbaec175_remote_collectors_idempotent_ingestion_.py`.
+- Testes do backend: `backend/tests/test_collectors.py`, `backend/tests/test_collector_client.py`, `backend/tests/test_privacy_operations.py`.
+- Coletor: `collector/edgehealth_collector.py`, `collector/requirements.txt`, `collector/README.md`.
+- Documentação: `docs/DEPLOY.md`, `docs/LGPD.md`.
+- Frontend: `frontend/public/termos.html`, `frontend/public/privacidade.html`, `frontend/public/legal.css`, `frontend/src/pages/Coletores.js`.
+
+**Alterados:**
+
+- Raiz: `.gitignore`, `README.md`.
+- Backend: `backend/.env.example`, `backend/app/__init__.py`, `api.py`, `cli.py`, `config.py`, `models.py`, `services/auth.py`, `services/management.py`, `services/monitoring.py`, `services/queries.py`, `services/reports.py`, `services/serialization.py`.
+- Testes do backend: `backend/tests/conftest.py`, `test_auth_and_crud.py`, `test_legacy_and_migrations.py`.
+- Documentação: `docs/CHANGE_MANIFEST.md`, `docs/DEMO.md`, `docs/IMPLEMENTATION_STATUS.md`, `docs/POST_IMPLEMENTATION_REVIEW.md`.
+- Frontend: `frontend/src/app.js`, `pages/Dashboard.js`, `pages/Dispositivos.js`, `pages/Login.js`, `styles.css`, `frontend/tests/integration.test.js`.
+
+**Removidos:** nenhum.
+
+**Dependências:** nenhuma nova no backend nem no frontend. O coletor usa somente `icmplib==3.0.4`, que já era dependência do backend.
+
+---
+
+## Etapa de 09/09/2026
+
+Comparação com o commit base `fc60d981e783270e3d6caeed72f88bd1d9e91029`, incluindo o trabalho preservado da execução anterior. Ambientes virtuais, node_modules, builds, bancos operacionais e caches não fazem parte da entrega versionada.
+
+Contagem por caminho, sem detecção de renomeação: a mudança de `frontend/public/index.html` para `frontend/index.html` aparece como remoção e criação.
+
+## Criados — 48
+
+- [backend/app/api.py](../backend/app/api.py)
+- [backend/app/cli.py](../backend/app/cli.py)
+- [backend/app/extensions.py](../backend/app/extensions.py)
+- [backend/app/models.py](../backend/app/models.py)
+- [backend/app/services/auth.py](../backend/app/services/auth.py)
+- [backend/app/services/catalog.py](../backend/app/services/catalog.py)
+- [backend/app/services/diagnostics.py](../backend/app/services/diagnostics.py)
+- [backend/app/services/legacy.py](../backend/app/services/legacy.py)
+- [backend/app/services/management.py](../backend/app/services/management.py)
+- [backend/app/services/monitoring.py](../backend/app/services/monitoring.py)
+- [backend/app/services/queries.py](../backend/app/services/queries.py)
+- [backend/app/services/reports.py](../backend/app/services/reports.py)
+- [backend/app/services/serialization.py](../backend/app/services/serialization.py)
+- [backend/app/validation.py](../backend/app/validation.py)
+- [backend/migrations/README](../backend/migrations/README)
+- [backend/migrations/alembic.ini](../backend/migrations/alembic.ini)
+- [backend/migrations/env.py](../backend/migrations/env.py)
+- [backend/migrations/script.py.mako](../backend/migrations/script.py.mako)
+- [backend/migrations/versions/55463d3f0b18_mvp_schema_with_tenant_isolation_and_.py](../backend/migrations/versions/55463d3f0b18_mvp_schema_with_tenant_isolation_and_.py)
+- [backend/migrations/versions/7c7ba005affc_preserve_legacy_records_without_.py](../backend/migrations/versions/7c7ba005affc_preserve_legacy_records_without_.py)
+- [backend/pytest.ini](../backend/pytest.ini)
+- [backend/requirements-dev.lock](../backend/requirements-dev.lock)
+- [backend/requirements-dev.txt](../backend/requirements-dev.txt)
+- [backend/tests/conftest.py](../backend/tests/conftest.py)
+- [backend/tests/test_auth_and_crud.py](../backend/tests/test_auth_and_crud.py)
+- [backend/tests/test_diagnostic_rules.py](../backend/tests/test_diagnostic_rules.py)
+- [backend/tests/test_isolation_reports.py](../backend/tests/test_isolation_reports.py)
+- [backend/tests/test_legacy_and_migrations.py](../backend/tests/test_legacy_and_migrations.py)
+- [backend/tests/test_monitoring.py](../backend/tests/test_monitoring.py)
+- [backend/tests/test_tenants_reports.py](../backend/tests/test_tenants_reports.py)
+- [backend/tests/ui_server.py](../backend/tests/ui_server.py)
+- [docs/CHANGE_MANIFEST.md](../docs/CHANGE_MANIFEST.md)
+- [docs/DEMO.md](../docs/DEMO.md)
+- [docs/IMPLEMENTATION_STATUS.md](../docs/IMPLEMENTATION_STATUS.md)
+- [docs/LEGACY.md](../docs/LEGACY.md)
+- [docs/POST_IMPLEMENTATION_REVIEW.md](../docs/POST_IMPLEMENTATION_REVIEW.md)
+- [frontend/index.html](../frontend/index.html)
+- [frontend/package-lock.json](../frontend/package-lock.json)
+- [frontend/src/pages/Empresa.js](../frontend/src/pages/Empresa.js)
+- [frontend/src/pages/Falha.js](../frontend/src/pages/Falha.js)
+- [frontend/src/pages/Historico.js](../frontend/src/pages/Historico.js)
+- [frontend/src/pages/Relatorios.js](../frontend/src/pages/Relatorios.js)
+- [frontend/src/pages/Usuarios.js](../frontend/src/pages/Usuarios.js)
+- [frontend/src/styles.css](../frontend/src/styles.css)
+- [frontend/src/ui/dom.js](../frontend/src/ui/dom.js)
+- [frontend/tests/integration.test.js](../frontend/tests/integration.test.js)
+- [frontend/tests/ui.test.js](../frontend/tests/ui.test.js)
+- [frontend/vite.config.js](../frontend/vite.config.js)
+
+## Alterados — 14
+
+- [.gitignore](../.gitignore)
+- [README.md](../README.md)
+- [backend/.env.example](../backend/.env.example)
+- [backend/app/__init__.py](../backend/app/__init__.py)
+- [backend/app/config.py](../backend/app/config.py)
+- [backend/app/services/__init__.py](../backend/app/services/__init__.py)
+- [backend/requirements.txt](../backend/requirements.txt)
+- [backend/run.py](../backend/run.py)
+- [frontend/package.json](../frontend/package.json)
+- [frontend/src/app.js](../frontend/src/app.js)
+- [frontend/src/pages/Dashboard.js](../frontend/src/pages/Dashboard.js)
+- [frontend/src/pages/Dispositivos.js](../frontend/src/pages/Dispositivos.js)
+- [frontend/src/pages/Login.js](../frontend/src/pages/Login.js)
+- [frontend/src/services/api.js](../frontend/src/services/api.js)
+
+## Removidos/consolidados — 172
+
+Arquivos obsoletos e cópias divergentes; continuam recuperáveis no Git. Nenhum banco antigo é convertido automaticamente em medições reais.
+
+- `0.1/EdgeHealth/README.md`
+- `0.1/EdgeHealth/backend/__pycache__/run.cpython-314.pyc`
+- `0.1/EdgeHealth/backend/app/__init__.py`
+- `0.1/EdgeHealth/backend/app/__pycache__/__init__.cpython-314.pyc`
+- `0.1/EdgeHealth/backend/app/__pycache__/config.cpython-314.pyc`
+- `0.1/EdgeHealth/backend/app/config.py`
+- `0.1/EdgeHealth/backend/app/controllers/__init__.py`
+- `0.1/EdgeHealth/backend/app/controllers/__pycache__/__init__.cpython-314.pyc`
+- `0.1/EdgeHealth/backend/app/controllers/__pycache__/auth_controller.cpython-314.pyc`
+- `0.1/EdgeHealth/backend/app/controllers/__pycache__/dispositivo_controller.cpython-314.pyc`
+- `0.1/EdgeHealth/backend/app/controllers/__pycache__/empresa_controller.cpython-314.pyc`
+- `0.1/EdgeHealth/backend/app/controllers/__pycache__/falha_controller.cpython-314.pyc`
+- `0.1/EdgeHealth/backend/app/controllers/__pycache__/metrica_controller.cpython-314.pyc`
+- `0.1/EdgeHealth/backend/app/controllers/__pycache__/usuario_controller.cpython-314.pyc`
+- `0.1/EdgeHealth/backend/app/controllers/auth_controller.py`
+- `0.1/EdgeHealth/backend/app/controllers/dispositivo_controller.py`
+- `0.1/EdgeHealth/backend/app/controllers/empresa_controller.py`
+- `0.1/EdgeHealth/backend/app/controllers/falha_controller.py`
+- `0.1/EdgeHealth/backend/app/controllers/metrica_controller.py`
+- `0.1/EdgeHealth/backend/app/controllers/usuario_controller.py`
+- `0.1/EdgeHealth/backend/app/models/__init__.py`
+- `0.1/EdgeHealth/backend/app/models/__pycache__/__init__.cpython-314.pyc`
+- `0.1/EdgeHealth/backend/app/models/__pycache__/dispositivo.cpython-314.pyc`
+- `0.1/EdgeHealth/backend/app/models/__pycache__/empresa.cpython-314.pyc`
+- `0.1/EdgeHealth/backend/app/models/__pycache__/historico_falha.cpython-314.pyc`
+- `0.1/EdgeHealth/backend/app/models/__pycache__/metrica.cpython-314.pyc`
+- `0.1/EdgeHealth/backend/app/models/__pycache__/usuario.cpython-314.pyc`
+- `0.1/EdgeHealth/backend/app/models/dispositivo.py`
+- `0.1/EdgeHealth/backend/app/models/empresa.py`
+- `0.1/EdgeHealth/backend/app/models/historico_falha.py`
+- `0.1/EdgeHealth/backend/app/models/metrica.py`
+- `0.1/EdgeHealth/backend/app/models/usuario.py`
+- `0.1/EdgeHealth/backend/app/routes/__init__.py`
+- `0.1/EdgeHealth/backend/app/routes/__pycache__/__init__.cpython-314.pyc`
+- `0.1/EdgeHealth/backend/app/routes/__pycache__/api.cpython-314.pyc`
+- `0.1/EdgeHealth/backend/app/routes/api.py`
+- `0.1/EdgeHealth/backend/app/services/__init__.py`
+- `0.1/EdgeHealth/backend/app/services/__pycache__/__init__.cpython-314.pyc`
+- `0.1/EdgeHealth/backend/app/services/__pycache__/auth_service.cpython-314.pyc`
+- `0.1/EdgeHealth/backend/app/services/__pycache__/dispositivo_service.cpython-314.pyc`
+- `0.1/EdgeHealth/backend/app/services/__pycache__/empresa_service.cpython-314.pyc`
+- `0.1/EdgeHealth/backend/app/services/__pycache__/falha_service.cpython-314.pyc`
+- `0.1/EdgeHealth/backend/app/services/__pycache__/metrica_service.cpython-314.pyc`
+- `0.1/EdgeHealth/backend/app/services/__pycache__/ping_service.cpython-314.pyc`
+- `0.1/EdgeHealth/backend/app/services/__pycache__/usuario_service.cpython-314.pyc`
+- `0.1/EdgeHealth/backend/app/services/auth_service.py`
+- `0.1/EdgeHealth/backend/app/services/dispositivo_service.py`
+- `0.1/EdgeHealth/backend/app/services/empresa_service.py`
+- `0.1/EdgeHealth/backend/app/services/falha_service.py`
+- `0.1/EdgeHealth/backend/app/services/metrica_service.py`
+- `0.1/EdgeHealth/backend/app/services/ping_service.py`
+- `0.1/EdgeHealth/backend/app/services/usuario_service.py`
+- `0.1/EdgeHealth/backend/instance/edgehealth.db`
+- `0.1/EdgeHealth/backend/requirements.txt`
+- `0.1/EdgeHealth/backend/run.py`
+- `0.1/EdgeHealth/frontend/package.json`
+- `0.1/EdgeHealth/frontend/public/index.html`
+- `0.1/EdgeHealth/frontend/public/test.html`
+- `0.1/EdgeHealth/frontend/src/app.js`
+- `0.1/EdgeHealth/frontend/src/pages/Dashboard.js`
+- `0.1/EdgeHealth/frontend/src/pages/Dispositivos.js`
+- `0.1/EdgeHealth/frontend/src/pages/Empresas.js`
+- `0.1/EdgeHealth/frontend/src/pages/Login.js`
+- `0.1/EdgeHealth/frontend/src/services/api.js`
+- `backend/__pycache__/run.cpython-314.pyc`
+- `backend/app/__pycache__/__init__.cpython-314.pyc`
+- `backend/app/__pycache__/config.cpython-314.pyc`
+- `backend/app/controllers/__init__.py`
+- `backend/app/controllers/__pycache__/__init__.cpython-314.pyc`
+- `backend/app/controllers/__pycache__/auth_controller.cpython-314.pyc`
+- `backend/app/controllers/__pycache__/dispositivo_controller.cpython-314.pyc`
+- `backend/app/controllers/__pycache__/empresa_controller.cpython-314.pyc`
+- `backend/app/controllers/__pycache__/falha_controller.cpython-314.pyc`
+- `backend/app/controllers/__pycache__/metrica_controller.cpython-314.pyc`
+- `backend/app/controllers/__pycache__/usuario_controller.cpython-314.pyc`
+- `backend/app/controllers/auth_controller.py`
+- `backend/app/controllers/dispositivo_controller.py`
+- `backend/app/controllers/empresa_controller.py`
+- `backend/app/controllers/falha_controller.py`
+- `backend/app/controllers/metrica_controller.py`
+- `backend/app/controllers/usuario_controller.py`
+- `backend/app/models/__init__.py`
+- `backend/app/models/__pycache__/__init__.cpython-314.pyc`
+- `backend/app/models/__pycache__/dispositivo.cpython-314.pyc`
+- `backend/app/models/__pycache__/empresa.cpython-314.pyc`
+- `backend/app/models/__pycache__/historico_falha.cpython-314.pyc`
+- `backend/app/models/__pycache__/metrica.cpython-314.pyc`
+- `backend/app/models/__pycache__/usuario.cpython-314.pyc`
+- `backend/app/models/dispositivo.py`
+- `backend/app/models/empresa.py`
+- `backend/app/models/historico_falha.py`
+- `backend/app/models/metrica.py`
+- `backend/app/models/usuario.py`
+- `backend/app/repositories/dispositivo_repository.py`
+- `backend/app/routes/__init__.py`
+- `backend/app/routes/__pycache__/__init__.cpython-314.pyc`
+- `backend/app/routes/__pycache__/api.cpython-314.pyc`
+- `backend/app/routes/api.py`
+- `backend/app/services/__pycache__/__init__.cpython-314.pyc`
+- `backend/app/services/__pycache__/auth_service.cpython-314.pyc`
+- `backend/app/services/__pycache__/dispositivo_service.cpython-314.pyc`
+- `backend/app/services/__pycache__/empresa_service.cpython-314.pyc`
+- `backend/app/services/__pycache__/falha_service.cpython-314.pyc`
+- `backend/app/services/__pycache__/metrica_service.cpython-314.pyc`
+- `backend/app/services/__pycache__/ping_service.cpython-314.pyc`
+- `backend/app/services/__pycache__/usuario_service.cpython-314.pyc`
+- `backend/app/services/auth_service.py`
+- `backend/app/services/dispositivo_service.py`
+- `backend/app/services/empresa_service.py`
+- `backend/app/services/falha_service.py`
+- `backend/app/services/metrica_service.py`
+- `backend/app/services/ping_service.py`
+- `backend/app/services/usuario_service.py`
+- `backend/backend/__pycache__/run.cpython-314.pyc`
+- `backend/backend/app/__init__.py`
+- `backend/backend/app/__pycache__/__init__.cpython-314.pyc`
+- `backend/backend/app/__pycache__/config.cpython-314.pyc`
+- `backend/backend/app/config.py`
+- `backend/backend/app/controllers/__init__.py`
+- `backend/backend/app/controllers/__pycache__/__init__.cpython-314.pyc`
+- `backend/backend/app/controllers/__pycache__/auth_controller.cpython-314.pyc`
+- `backend/backend/app/controllers/__pycache__/dispositivo_controller.cpython-314.pyc`
+- `backend/backend/app/controllers/__pycache__/empresa_controller.cpython-314.pyc`
+- `backend/backend/app/controllers/__pycache__/falha_controller.cpython-314.pyc`
+- `backend/backend/app/controllers/__pycache__/metrica_controller.cpython-314.pyc`
+- `backend/backend/app/controllers/__pycache__/usuario_controller.cpython-314.pyc`
+- `backend/backend/app/controllers/auth_controller.py`
+- `backend/backend/app/controllers/dispositivo_controller.py`
+- `backend/backend/app/controllers/empresa_controller.py`
+- `backend/backend/app/controllers/falha_controller.py`
+- `backend/backend/app/controllers/metrica_controller.py`
+- `backend/backend/app/controllers/usuario_controller.py`
+- `backend/backend/app/models/__init__.py`
+- `backend/backend/app/models/__pycache__/__init__.cpython-314.pyc`
+- `backend/backend/app/models/__pycache__/dispositivo.cpython-314.pyc`
+- `backend/backend/app/models/__pycache__/empresa.cpython-314.pyc`
+- `backend/backend/app/models/__pycache__/historico_falha.cpython-314.pyc`
+- `backend/backend/app/models/__pycache__/metrica.cpython-314.pyc`
+- `backend/backend/app/models/__pycache__/usuario.cpython-314.pyc`
+- `backend/backend/app/models/dispositivo.py`
+- `backend/backend/app/models/empresa.py`
+- `backend/backend/app/models/historico_falha.py`
+- `backend/backend/app/models/metrica.py`
+- `backend/backend/app/models/usuario.py`
+- `backend/backend/app/routes/__init__.py`
+- `backend/backend/app/routes/__pycache__/__init__.cpython-314.pyc`
+- `backend/backend/app/routes/__pycache__/api.cpython-314.pyc`
+- `backend/backend/app/routes/api.py`
+- `backend/backend/app/services/__init__.py`
+- `backend/backend/app/services/__pycache__/__init__.cpython-314.pyc`
+- `backend/backend/app/services/__pycache__/auth_service.cpython-314.pyc`
+- `backend/backend/app/services/__pycache__/dispositivo_service.cpython-314.pyc`
+- `backend/backend/app/services/__pycache__/empresa_service.cpython-314.pyc`
+- `backend/backend/app/services/__pycache__/falha_service.cpython-314.pyc`
+- `backend/backend/app/services/__pycache__/metrica_service.cpython-314.pyc`
+- `backend/backend/app/services/__pycache__/ping_service.cpython-314.pyc`
+- `backend/backend/app/services/__pycache__/usuario_service.cpython-314.pyc`
+- `backend/backend/app/services/auth_service.py`
+- `backend/backend/app/services/dispositivo_service.py`
+- `backend/backend/app/services/empresa_service.py`
+- `backend/backend/app/services/falha_service.py`
+- `backend/backend/app/services/metrica_service.py`
+- `backend/backend/app/services/ping_service.py`
+- `backend/backend/app/services/usuario_service.py`
+- `backend/backend/instance/edgehealth.db`
+- `backend/backend/requirements.txt`
+- `backend/backend/run.py`
+- `backend/instance/edgehealth.db`
+- `backend/instance/edgehealth_new.db`
+- `backend/tests/test_features.py`
+- `backend/tests/test_project_requirements.py`
+- `frontend/public/index.html`

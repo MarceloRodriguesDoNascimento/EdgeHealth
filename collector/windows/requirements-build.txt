@@ -1,0 +1,7 @@
+# Build-only dependencies for EdgeHealthColetor.exe (see build.ps1). The collector itself
+# still needs only icmplib (collector/requirements.txt).
+icmplib==3.0.4
+certifi==2026.7.22
+pyinstaller==6.22.3
+pyinstaller-hooks-contrib==2026.8
+pillow==12.3.0
