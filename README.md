@@ -11,15 +11,16 @@ O resultado aparece em um painel web multiempresa: dashboard com ranking de cust
 1. [Equipe](#equipe)
 2. [Stack](#stack)
 3. [Funcionalidades Implementadas](#funcionalidades-implementadas)
-4. [Arquitetura](#arquitetura)
-5. [Banco de dados](#banco-de-dados)
-6. [Rotas da API](#rotas-da-api)
-7. [Como executar](#como-executar)
-8. [Coletor remoto](#coletor-remoto)
-9. [Explicar ocorrência com IA](#explicar-ocorrência-com-ia)
-10. [Hospedagem](#hospedagem)
-11. [Testes e status](#testes-e-status)
-12. [Documentação complementar](#documentação-complementar)
+4. [Casos de uso e telas](#casos-de-uso-e-telas)
+5. [Arquitetura](#arquitetura) (inclui [Cliente-servidor](#cliente-servidor))
+6. [Banco de dados](#banco-de-dados)
+7. [Rotas da API](#rotas-da-api)
+8. [Como executar](#como-executar)
+9. [Coletor remoto](#coletor-remoto)
+10. [Explicar ocorrência com IA](#explicar-ocorrência-com-ia)
+11. [Hospedagem](#hospedagem)
+12. [Testes e status](#testes-e-status)
+13. [Documentação complementar](#documentação-complementar)
 
 ## Equipe
 
@@ -81,6 +82,23 @@ Cada linha funciona de ponta a ponta: tela → rota → Controller → Service �
 | 26 | ★ Dashboard com estados, severidades, gráficos e ranking de dispositivos por custo | `frontend/src/pages/Dashboard.js` | `GET /api/dashboard` | `GerarDashboardService`, `ResumirPrejuizoService` | `DashboardRepository.contagem_por_status`, `RankingCustoRepository.top_dispositivos` |
 | 27 | ★ Exportar relatório ZIP (CSV de dispositivos, métricas, falhas e diagnósticos) | `frontend/src/pages/Relatorios.js` | `GET /api/relatorios/exportar` | `ExportarRelatorioService` | `RelatorioRepository.falhas_sobrepostas` |
 
+## Casos de uso e telas
+
+Os seis casos de uso dos [fluxogramas](docs/fluxogramas.md) e as telas em que acontecem. Capturas com dados fictícios, geradas por `frontend/tests/support/telas.mjs` (`npm run build && node tests/support/telas.mjs` em `frontend/`).
+
+| Caso de uso | Tipo | Tela |
+| --- | --- | --- |
+| 1. Cadastrar dispositivo | Entrada de dados | [Dispositivos](docs/img/telas/dispositivos.png) · [formulário](docs/img/telas/modal-dispositivo.png) |
+| 2. Coletor envia amostras e o sistema detecta a falha | Entrada de dados | [Coletores](docs/img/telas/coletores.png) · [métricas do dispositivo](docs/img/telas/modal-metricas.png) |
+| 3. Registrar o impacto de uma ocorrência | Entrada de dados | [Ocorrência: impacto, prejuízo e diagnóstico](docs/img/telas/falha.png) |
+| 4. Histórico de falhas com filtros e paginação | Recuperação de dados | [Histórico de falhas](docs/img/telas/historico.png) |
+| 5. Visão da rede (dashboard) | Recuperação de dados | [Visão da rede](docs/img/telas/visao-da-rede.png) |
+| 6. Explicar ocorrência com IA | Recuperação de dados com IA | [Ocorrência: painel "Explicação com IA"](docs/img/telas/falha.png) |
+
+Outras telas: [login](docs/img/telas/login.png), [cadastro da empresa com aceite dos Termos](docs/img/telas/cadastro.png), [relatórios](docs/img/telas/relatorios.png), [empresa e custos](docs/img/telas/empresa.png) e [equipe](docs/img/telas/equipe.png).
+
+![Visão da rede](docs/img/telas/visao-da-rede.png)
+
 ## Arquitetura
 
 ### Cliente-servidor
@@ -91,7 +109,22 @@ O frontend e o backend são **aplicações separadas** que conversam somente por
 - `backend/` — API REST Flask em `http://127.0.0.1:5000/api`. Não gera HTML de páginas: devolve JSON.
 - `collector/` — terceiro cliente da mesma API, instalado na rede da empresa, que envia medições com credencial própria.
 
-Em produção, `npm run build` gera `frontend/dist/` e o Flask serve esses arquivos estáticos junto com a API, na mesma origem (sem CORS e com o cookie de sessão protegido). Continua sendo cliente-servidor: o navegador baixa o cliente e consome a API por `fetch`.
+Em produção, `npm run build` gera `frontend/dist/` e o Flask serve esses arquivos estáticos junto com a API, na mesma origem (sem CORS e com o cookie de sessão protegido). Continua sendo cliente-servidor: o navegador baixa o cliente e consome a API por `fetch` (`frontend/src/services/api.js`).
+
+**Prova com os dois servidores separados** (dois terminais, ver [Como executar](#como-executar)):
+
+```bash
+# terminal 1, em backend/: API Flask na porta 5000
+python -m flask --app run.py run --port 5000
+# terminal 2, em frontend/: cliente Vite na porta 5173
+npm run dev
+# terminal 3: cada servidor responde pelo seu papel
+curl -i http://127.0.0.1:5000/api/health   # 200 application/json {"status":"ok"} (Server: Werkzeug)
+curl -i http://127.0.0.1:5173/             # 200 text/html com <script src="/src/app.js"> (Vite)
+curl -i http://127.0.0.1:5173/api/health   # 200 application/json: o Vite repassa à API por HTTP
+```
+
+Na auditoria de 09/10/2026 os dois ficaram escutando em processos diferentes (`netstat`: `:5173` e `:5000` com PIDs distintos) e o log do Flask registrou as requisições `GET /api/health` que chegaram pelo Vite ([docs/AUDITORIA.md](docs/AUDITORIA.md)).
 
 ```mermaid
 flowchart TD
@@ -338,10 +371,10 @@ As **credenciais de demonstração são entregues ao professor pelo Google Class
 
 Validação de 09/10/2026 (Windows 11, Python 3.12.10, Node 24):
 
-- **Backend:** 184 testes aprovados e 3 pulados (os opcionais de ICMP real).
+- **Backend:** 185 testes aprovados e 3 pulados (os opcionais de ICMP real).
 - **Frontend:** 20 de 20 aprovados (jsdom, API HTTP real temporária, build servido pelo Flask, proxy Vite e telas responsivas).
 
-As suítes cobrem também a documentação: `test_readme.py` (esta tabela de funcionalidades e as rotas), `test_flowcharts.py`, `test_diagram.py`, `test_database_script.py` e `test_architecture.py`.
+As suítes cobrem também a documentação: `test_readme.py` (tabela de funcionalidades, rotas e links), `test_flowcharts.py`, `test_diagram.py`, `test_database_script.py` e `test_architecture.py`.
 
 Limites conhecidos: o MVP mede de um ponto de rede por dispositivo, não descobre topologia; usuários afetados são estimados pela equipe; o diagnóstico aponta hipóteses, não certezas. As minutas jurídicas ([Termos](frontend/public/termos.html), [Privacidade](frontend/public/privacidade.html), [LGPD.md](docs/LGPD.md)) precisam de revisão pelos responsáveis.
 
@@ -349,6 +382,7 @@ Limites conhecidos: o MVP mede de um ponto de rede por dispositivo, não descobr
 
 | Documento | Conteúdo |
 | --- | --- |
+| [docs/AUDITORIA.md](docs/AUDITORIA.md) | Auditoria do projeto contra a rubrica da disciplina |
 | [docs/diagrama-classes.md](docs/diagrama-classes.md) | Diagrama de classes do domínio |
 | [docs/fluxogramas.md](docs/fluxogramas.md) | Fluxogramas dos 6 casos de uso |
 | [backend/database/README.md](backend/database/README.md) | Script do banco, SQLite e Stored Procedures |
