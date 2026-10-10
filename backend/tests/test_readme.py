@@ -63,3 +63,10 @@ def test_feature_route_service_layer_and_screen_exist(row):
 def test_routes_table_lists_every_route_with_controller_and_access():
     table = {(m, CODE.search(u).group(1)): (a, CODE.search(c).group(1)) for c, m, u, a in rows('Rotas da API')}
     assert table == code_routes()
+
+
+def test_every_relative_link_points_to_an_existing_file():
+    links = re.findall(r'\]\(([^)#\s]+)(?:#[^)]*)?\)', README.read_text(encoding='utf-8'))
+    local = [link for link in links if not re.match(r'[a-z]+:', link)]
+    assert len(local) >= 20
+    assert not [link for link in local if not (ROOT / link).exists()]
