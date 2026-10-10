@@ -10,7 +10,7 @@ Legenda: ✅ atendido · ⚠️ atendido com ressalva · ❌ não atendido.
 
 | Critério | Pontos | Evidência | Status | Ação |
 | --- | --- | --- | --- | --- |
-| **Fluxo do sistema** — funcionalidades principais não-CRUD de ponta a ponta | 4/4 | 7 funcionalidades ★ no README (detecção de falhas pelo coletor, diagnóstico com recomendações, prejuízo estimado, explicação com IA, dashboard com ranking de custo, relatório ZIP). Todas chamadas **em produção** em 09/10/2026 (tabela [Produção](#produção-0910-2026)). | ✅ | — |
+| **Fluxo do sistema** — funcionalidades principais não-CRUD de ponta a ponta | 4/4 | 6 funcionalidades ★ no README (detecção de falhas pelo coletor, diagnóstico com recomendações, prejuízo estimado, explicação com IA, dashboard com ranking de custo, relatório ZIP). Todas chamadas **em produção** em 09/10/2026 (tabela [Produção](#produção-0910-2026)). | ✅ | — |
 | **Cliente-servidor** — servidores separados (2) | 2/2 | `frontend/` (Vite) e `backend/` (Flask) são aplicações separadas. Prova: Vite escutando em `:5173` (PID 21272) e Flask em `:5000` (PID 21596) ao mesmo tempo (`netstat`). | ✅ | — |
 | **Cliente-servidor** — frontend consome a API por requisições (2) | 2/2 | `frontend/src/services/api.js` usa `fetch('/api…')`; `curl :5173/api/health` → 200 JSON, e o log do Flask registrou `GET /api/health` vindo do Vite. Comandos no README, seção "Cliente-servidor". | ✅ | — |
 | **Camadas** — Controllers recebem e acionam casos de uso (1) | 1/1 | `backend/controllers/`: 12 classes, uma por recurso, herdando `BaseController`; `rotas.py` liga URL → método. Nenhum importa `db`/`sqlalchemy` (`tests/test_architecture.py`). | ✅ | Cada método chama um único Service (`test_architecture.py`). |
@@ -97,7 +97,7 @@ Código morto: nenhum resto de `app/api.py`, `app/models.py` ou `app/services/` 
 - [ ] **Vídeo de até 5 minutos** (obrigatório): pitch (problema, público, solução) + demonstração das ★. Roteiro cronometrado: [docs/ROTEIRO_VIDEO.md](ROTEIRO_VIDEO.md).
 - [ ] **Slides e pitch** para 07/11 (as imagens de `docs/img/` servem para os slides).
 - [ ] **Ensaio** com cronômetro, incluindo um plano B se a Internet falhar (vídeo gravado).
-- [ ] **Renovar o PythonAnywhere antes de 07/11** (aba Web → "Run until 3 months from today").
+- [ ] **Renovar o PythonAnywhere antes de 07/11** (aba Web → "Run until 1 month from today").
 - [ ] **Entregar as credenciais de demonstração ao professor pelo Classroom** (nunca no repositório).
 - [ ] Decidir sobre os pontos fracos 1 e 2 (se quiserem corrigir antes de 23/10).
 - [ ] Gravar o vídeo seguindo [docs/ROTEIRO_VIDEO.md](ROTEIRO_VIDEO.md).
