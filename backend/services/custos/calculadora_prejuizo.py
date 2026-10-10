@@ -28,10 +28,14 @@ class CalculadoraPrejuizo:
         return None if value is None else str(Decimal(value).quantize(cls.CENT, rounding=ROUND_HALF_UP))
 
     @staticmethod
-    def custo_hora(empresa):
-        if empresa.salario_medio is None or not empresa.horas_mes:
+    def custo_hora_de(salario, fator, horas):
+        if salario is None or not horas:
             return None
-        return empresa.salario_medio * empresa.fator_encargos / Decimal(empresa.horas_mes)
+        return salario * fator / Decimal(horas)
+
+    @classmethod
+    def custo_hora(cls, empresa):
+        return cls.custo_hora_de(empresa.salario_medio, empresa.fator_encargos, empresa.horas_mes)
 
     @classmethod
     def resumo_empresa(cls, empresa):

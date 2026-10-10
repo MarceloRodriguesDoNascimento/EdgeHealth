@@ -47,6 +47,7 @@ ROTAS = [
     ('/empresa', 'GET', 'company', sessao, empresa.obter),
     ('/empresa', 'PUT', 'update_company', admin, empresa.atualizar),
     ('/empresa/custos', 'PUT', 'update_company_costs', admin, empresa.configurar_custos),
+    ('/empresa/custos/previa', 'POST', 'preview_company_costs', admin, empresa.simular_custos),
     ('/empresa/custos/pular', 'POST', 'skip_cost_assistant', admin, empresa.pular_assistente_custos),
 
     ('/usuarios', 'GET', 'users', admin, usuario.listar),

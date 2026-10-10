@@ -491,14 +491,14 @@ def bonus_quality(prs):
         box(slide, Inches(0.6) + i * Inches(4.1), Inches(1.45), Inches(3.85), Inches(2.85), title, body,
             color=MINT, body_size=20, title_size=24)
     box(slide, Inches(0.6), Inches(4.55), Inches(12.05), Inches(2.25), 'Qualidade e segurança', [
-        '186 testes no backend e 20 no frontend, todos passando.',
+        '187 testes no backend e 20 no frontend, todos passando.',
         'Senhas com hash, sessão protegida contra CSRF, cada empresa só vê os próprios dados.'],
         color=LIGHT, body_size=22, title_size=24)
     notes(slide, JL, 50, [
         'Fizemos os três bônus. A IA como serviço: o Gemini explica a ocorrência, e a gente manda só dados técnicos, nunca nome, e-mail, CNPJ ou IP.',
         'O sistema está hospedado no PythonAnywhere, com HTTPS.',
         'E tem os termos: ninguém usa o sistema sem aceitar, e a versão aceita fica registrada, junto com o aviso de privacidade da LGPD.',
-        'Sobre qualidade: são 186 testes automatizados no backend e 20 no frontend, todos passando.',
+        'Sobre qualidade: são 187 testes automatizados no backend e 20 no frontend, todos passando.',
         'As senhas são guardadas com hash, a sessão é protegida contra CSRF e uma empresa nunca vê os dados de outra.'])
 
 
