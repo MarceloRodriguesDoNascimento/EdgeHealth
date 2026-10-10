@@ -389,6 +389,8 @@ Limites conhecidos: o MVP mede de um ponto de rede por dispositivo, não descobr
 | [docs/PYTHONANYWHERE.md](docs/PYTHONANYWHERE.md) | Hospedagem gratuita usada na demonstração |
 | [docs/DEPLOY.md](docs/DEPLOY.md) | Produção, variáveis, backup e restauração |
 | [docs/LGPD.md](docs/LGPD.md) | Inventário de dados, bases legais, operadores (Google, PythonAnywhere) |
+| [apresentacao/ROTEIRO_APRESENTACAO.md](apresentacao/ROTEIRO_APRESENTACAO.md) | Apresentação final: slides, divisão das falas e demonstração ao vivo |
+| [apresentacao/PERGUNTAS_ARGUICAO.md](apresentacao/PERGUNTAS_ARGUICAO.md) | 25 perguntas prováveis da arguição, com respostas baseadas no código |
 | [docs/ROTEIRO_VIDEO.md](docs/ROTEIRO_VIDEO.md) | Roteiro cronometrado do vídeo de demonstração (até 5 min) |
 | [docs/DEMO.md](docs/DEMO.md) | Roteiro de demonstração |
 | [docs/LEGACY.md](docs/LEGACY.md) | Importação do banco do protótipo |
