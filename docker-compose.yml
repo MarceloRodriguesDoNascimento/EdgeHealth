@@ -1,0 +1,20 @@
+# Single-host deployment. Put a TLS reverse proxy (provider load balancer, Caddy, Nginx…)
+# in front of port 8000; the app trusts exactly one proxy hop (TRUST_PROXY=1).
+services:
+  web:
+    build: .
+    image: edgehealth:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    env_file:
+      - path: backend/.env
+        required: false
+    environment:
+      DATABASE_URL: sqlite:////data/edgehealth.db
+      COOKIE_SECURE: "true"
+      TRUST_PROXY: "1"
+    volumes:
+      - edgehealth-data:/data
+volumes:
+  edgehealth-data:
