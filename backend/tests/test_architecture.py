@@ -61,3 +61,15 @@ def test_base_model_has_the_five_crud_operations():
     assert not missing, f'BaseModel não define: {missing}'
     entities = [getattr(models, name) for name in models.__all__ if hasattr(getattr(models, name), '__tablename__')]
     assert len(entities) == 13 and all(issubclass(entity, BaseModel) for entity in entities)
+
+
+def test_each_controller_method_calls_a_single_service():
+    """A controller method only translates HTTP: one use case per request, the coordination is in the service."""
+    problems = []
+    for path, tree in sources('controllers'):
+        for method in (n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)):
+            called = {n.func.id for n in ast.walk(method)
+                      if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id.endswith('Service')}
+            if len(called) > 1:
+                problems.append(f'{path}: {method.name} chama {sorted(called)}')
+    assert not problems, problems

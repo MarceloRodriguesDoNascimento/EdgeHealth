@@ -135,14 +135,13 @@ Imagem para slides: [SVG](img/fluxo-3-registrar-impacto.svg) · [PNG](img/fluxo-
 ```mermaid
 flowchart TD
     T["Falha.js: Usuários afetados, Custos diretos (R$), Observação"]:::tela -->|"PUT /api/falhas/{id}/impacto"| C["FalhaController.registrar_impacto"]:::ctrl
-    C --> O["ObterFalhaService.buscar"]:::svc
+    C -->|"id + corpo JSON"| S["RegistrarImpactoService.executar"]:::svc
+    S --> O["ObterFalhaService.buscar"]:::svc
     O --> R1["FalhaRepository.buscar_da_empresa<br/>JOIN dispositivos WHERE empresa_id"]:::repo
     R1 -->|"ocorrência de outra empresa ou inexistente"| E404["404"]:::erro
-    R1 --> P["payload: usuarios_afetados, custos_diretos, observacao"]:::ctrl
-    P -->|"campo não permitido"| E400a["400"]:::erro
-    P --> S["RegistrarImpactoService.executar"]:::svc
-    S -->|"número negativo ou valor inválido"| E400b["400"]:::erro
-    S --> M1["Impacto.buscar_um_por + Impacto.salvar(commit=False)<br/>dinheiro em Decimal exato"]:::model
+    R1 --> P["payload: usuarios_afetados, custos_diretos, observacao<br/>(validado só depois da busca)"]:::svc
+    P -->|"campo não permitido, número negativo ou valor inválido"| E400a["400"]:::erro
+    P --> M1["Impacto.buscar_um_por + Impacto.salvar(commit=False)<br/>dinheiro em Decimal exato"]:::model
     M1 --> D["AtualizarDiagnosticosService.executar"]:::svc
     D --> SV["CalcularSeveridadeService.executar<br/>10+ usuários: ALTA; 50+ usuários: CRITICA"]:::svc
     D --> R2["FalhaRepository.abertas_da_empresa<br/>FalhaRepository.encerradas_desde"]:::repo
@@ -254,14 +253,14 @@ Imagem para slides: [SVG](img/fluxo-6-explicar-com-ia.svg) · [PNG](img/fluxo-6-
 ```mermaid
 flowchart TD
     T["Falha.js: botão Explicar com IA<br/>(desabilitado se ia_disponivel = false)"]:::tela -->|"POST /api/falhas/{id}/explicacao-ia"| C["FalhaController.explicar_com_ia"]:::ctrl
-    C --> O["ObterFalhaService.buscar"]:::svc
+    C -->|"id + corpo JSON"| S["ExplicarFalhaComIaService.executar"]:::svc
+    S --> O["ObterFalhaService.buscar"]:::svc
     O --> R1["FalhaRepository.buscar_da_empresa"]:::repo
     R1 -->|"ocorrência de outra empresa"| E404["404"]:::erro
-    R1 --> P["payload vazio"]:::ctrl
+    R1 --> P["payload vazio<br/>(o prompt nunca vem do cliente)"]:::svc
     P -->|"campo extra no pedido"| E400["400"]:::erro
-    P --> S["ExplicarFalhaComIaService.executar"]:::svc
-    S -->|"GEMINI_API_KEY não configurada"| E503a["503 IA não configurada neste servidor"]:::erro
-    S --> L["LimiteUsoIa.registrar<br/>limite por empresa por hora"]:::svc
+    P -->|"GEMINI_API_KEY não configurada"| E503a["503 IA não configurada neste servidor"]:::erro
+    P --> L["LimiteUsoIa.registrar<br/>limite por empresa por hora"]:::svc
     L -->|"limite atingido"| E429["429"]:::erro
     L --> CT["ExplicarFalhaComIaService.contexto<br/>somente dados técnicos (lista de permitidos)"]:::svc
     CT --> M["Dispositivo.buscar_por_id, Impacto.buscar_um_por,<br/>Diagnostico.buscar_um_por: tipo, localização,<br/>horários, severidade, causas e recomendações"]:::model

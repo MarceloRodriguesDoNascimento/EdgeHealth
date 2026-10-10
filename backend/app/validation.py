@@ -6,6 +6,19 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from werkzeug.exceptions import BadRequest
 
 
+def json_object(data, allowed, required=()):
+    """Request body as a JSON object with only the allowed fields and every required one filled."""
+    if not isinstance(data, dict):
+        raise BadRequest('Envie um objeto JSON.')
+    unknown = set(data) - set(allowed)
+    if unknown:
+        raise BadRequest('Campos não permitidos: ' + ', '.join(sorted(unknown)))
+    for field in required:
+        if field not in data or data[field] is None or data[field] == '':
+            raise BadRequest(f'O campo {field} é obrigatório.')
+    return data
+
+
 def string(value, field, maximum=150, minimum=1):
     if not isinstance(value, str) or not minimum <= len(value.strip()) <= maximum:
         raise BadRequest(f'{field}: informe entre {minimum} e {maximum} caracteres.')
