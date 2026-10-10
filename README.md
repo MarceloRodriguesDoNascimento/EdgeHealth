@@ -1,37 +1,117 @@
 # EdgeHealth
 
-Monitoramento e diagnóstico lógico de redes para pequenas e médias empresas. Inventário por empresa, amostras ICMP históricas, ocorrências com ciclo de vida, impacto, diagnóstico por regras, recomendações, dashboard e exportação CSV.
+Pequenas e médias empresas costumam descobrir que a rede caiu quando alguém reclama, e raramente sabem a causa provável ou quanto a parada custou. O **EdgeHealth** é um SaaS de monitoramento e diagnóstico de redes para essas empresas e para o técnico de TI que as atende: um coletor instalado na rede da empresa mede os equipamentos (ICMP), o servidor detecta e acompanha as ocorrências, calcula a severidade, aponta a causa provável com recomendações e estima o prejuízo financeiro de cada parada.
 
-A implementação oficial está em `backend/` e `frontend/`. As cópias divergentes foram consolidadas; o histórico anterior permanece no Git. Não há seed de usuários, dispositivos, métricas ou falhas no produto.
+O resultado aparece em um painel web multiempresa: dashboard com ranking de custo, histórico de ocorrências com diagnóstico, explicação da ocorrência em linguagem simples por IA (Gemini) e relatório exportável. Tudo é calculado a partir de medições reais; não há dados simulados no produto.
 
-**Validação de 06/10/2026** (Windows 11, Python 3.12.10, Node 22):
+**Produção:** <https://marcelodomingos.pythonanywhere.com>
 
-- Backend: 46 testes aprovados; os 2 testes opcionais de rede real foram pulados na suíte padrão.
-- Frontend: 16 testes aprovados e build concluído.
-- ICMP real: aprovado nesta máquina em loopback e no gateway da LAN de teste, inclusive pelo coletor remoto enviando por HTTP.
+## Sumário
 
-Isso foi homologado em laboratório, não na rede de uma empresa cliente, e a aplicação **não está hospedada**. Detalhes em [o checkpoint](docs/IMPLEMENTATION_STATUS.md), [a revisão](docs/POST_IMPLEMENTATION_REVIEW.md), [a hospedagem](docs/DEPLOY.md), [a privacidade](docs/LGPD.md) e [a demonstração](docs/DEMO.md).
+1. [Equipe](#equipe)
+2. [Stack](#stack)
+3. [Funcionalidades Implementadas](#funcionalidades-implementadas)
+4. [Arquitetura](#arquitetura)
+5. [Banco de dados](#banco-de-dados)
+6. [Rotas da API](#rotas-da-api)
+7. [Como executar](#como-executar)
+8. [Coletor remoto](#coletor-remoto)
+9. [Explicar ocorrência com IA](#explicar-ocorrência-com-ia)
+10. [Hospedagem](#hospedagem)
+11. [Testes e status](#testes-e-status)
+12. [Documentação complementar](#documentação-complementar)
+
+## Equipe
+
+Turma: **[PS-3B1/2026] Projeto de Software — Colégio Cotemig**
+
+| Integrante | Matrícula |
+| --- | --- |
+| Marcelo Domingos | 22400362 |
+| Marcelo Rodrigues Alves do Nascimento | 12400815 |
+| Erick Daniel Coelho E Silva | 12401188 |
+| Felipe Barbosa Poeiras | 12402320 |
+| Matheus Brito Vaz Bernardes | 12502391 |
+| João Lucas Santos Batista | 12401617 |
+
+## Stack
+
+Versões conferidas em `backend/requirements.txt`, `frontend/package.json` e `collector/`.
+
+| Parte | Tecnologias |
+| --- | --- |
+| **Frontend** | JavaScript (módulos ES, sem framework), Vite 8.2.2, Chart.js 4.5.1, HTML/CSS responsivo. Testes: jsdom 26.1.0 e playwright-core 1.63. Node.js 22.12 ou superior. |
+| **Backend** | Python 3.12, Flask 3.1.3, Flask-SQLAlchemy 3.1.1 / SQLAlchemy 2.0.52, python-dotenv 1.2.3, icmplib 3.0.4 (ICMP), tzdata 2026.5, waitress 3.0.2 (servidor WSGI local). Testes: pytest. |
+| **Banco de dados** | SQLite, esquema versionado com Flask-Migrate 4.1.0 / Alembic; script DDL em [`backend/database/create_database.sql`](backend/database/create_database.sql). |
+| **IA** | Google Gemini (API REST `generateContent`), modelo padrão `gemini-3.5-flash-lite`, chamada pela biblioteca padrão (`urllib`), sem SDK. |
+| **Hospedagem** | PythonAnywhere (plano gratuito), Flask servindo a API e o build do frontend na mesma origem, HTTPS. |
+| **Coletor** | Python 3.12 + icmplib 3.0.4; executável Windows com PyInstaller 6.22.3, interface tkinter e tarefa agendada. |
+
+## Funcionalidades Implementadas
+
+Cada linha funciona de ponta a ponta: tela → rota → Controller → Service → Model/Repository → banco. ★ = funcionalidade principal que vai além de CRUD. `backend/tests/test_readme.py` confere que toda rota, Service, Model/Repository e tela desta tabela existem no código.
+
+| Nº | Funcionalidade | Tela | Rota | Service | Repository / Model |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Cadastrar empresa e administrador, com aceite dos Termos | `frontend/src/pages/Login.js` | `POST /api/auth/registro` | `RegistrarEmpresaService` | `Empresa`, `Usuario`, `AuthSession` |
+| 2 | Entrar com sessão segura e limite de tentativas | `frontend/src/pages/Login.js` | `POST /api/auth/login` | `AutenticarUsuarioService` | `AutenticacaoRepository.contar_tentativas`, `LoginAttempt` |
+| 3 | Aceitar Termos de Uso no primeiro acesso | `frontend/src/pages/Login.js` | `POST /api/auth/aceite-termos` | `AceitarTermosService` | `Usuario` |
+| 4 | Sair (revoga a sessão) | `frontend/src/app.js` | `POST /api/auth/logout` | `EncerrarSessaoService` | `AuthSession` |
+| 5 | Editar dados da empresa | `frontend/src/pages/Empresa.js` | `PUT /api/empresa` | `AtualizarEmpresaService` | `Empresa` |
+| 6 | Configurar custos da empresa (assistente de custos) | `frontend/src/pages/Empresa.js` | `PUT /api/empresa/custos` | `ConfigurarCustosService` | `Empresa` |
+| 7 | Cadastrar membro da equipe | `frontend/src/pages/Usuarios.js` | `POST /api/usuarios` | `CadastrarUsuarioService` | `Usuario`, `UsuarioRepository.listar_da_empresa` |
+| 8 | Editar, promover ou desativar membro | `frontend/src/pages/Usuarios.js` | `PUT /api/usuarios/<id>` | `AtualizarUsuarioService` | `UsuarioRepository.buscar_da_empresa`, `AutenticacaoRepository.remover_sessoes_do_usuario` |
+| 9 | Listar dispositivos (ativos e arquivados) | `frontend/src/pages/Dispositivos.js` | `GET /api/dispositivos` | `ListarDispositivosService` | `DispositivoRepository.listar_da_empresa` |
+| 10 | Cadastrar dispositivo | `frontend/src/pages/Dispositivos.js` | `POST /api/dispositivos` | `CadastrarDispositivoService` | `Dispositivo` |
+| 11 | Sugerir impacto padrão pelo tipo do dispositivo | `frontend/src/pages/Dispositivos.js` | `GET /api/dispositivos/impacto-padrao` | `ObterImpactoPadraoService` | `Empresa` |
+| 12 | Editar dispositivo | `frontend/src/pages/Dispositivos.js` | `PUT /api/dispositivos/<id>` | `AtualizarDispositivoService` | `Dispositivo`, `FalhaRepository.aberta_do_dispositivo` |
+| 13 | Arquivar dispositivo (preserva o histórico) | `frontend/src/pages/Dispositivos.js` | `DELETE /api/dispositivos/<id>` | `ArquivarDispositivoService` | `Dispositivo`, `FalhaRepository.aberta_do_dispositivo` |
+| 14 | Desarquivar dispositivo | `frontend/src/pages/Dispositivos.js` | `POST /api/dispositivos/<id>/desarquivar` | `DesarquivarDispositivoService` | `Dispositivo`, `DispositivoRepository.existe_ip_ativo` |
+| 15 | Solicitar coleta imediata | `frontend/src/pages/Dispositivos.js` | `POST /api/dispositivos/<id>/coletas` | `SolicitarColetaService` | `Dispositivo` |
+| 16 | Consultar histórico de métricas (latência e perda) | `frontend/src/pages/Dispositivos.js` | `GET /api/metricas` | `ListarMetricasService` | `MetricaRepository.por_periodo` |
+| 17 | Cadastrar coletor remoto (credencial exibida uma vez) | `frontend/src/pages/Coletores.js` | `POST /api/coletores` | `CadastrarColetorService` | `Coletor` |
+| 18 | Rotacionar a credencial do coletor | `frontend/src/pages/Coletores.js` | `POST /api/coletores/<id>/rotacionar` | `RotacionarCredencialColetorService`, `ObterColetorService` | `Coletor`, `ColetorRepository.buscar_da_empresa` |
+| 19 | Revogar coletor | `frontend/src/pages/Coletores.js` | `POST /api/coletores/<id>/revogar` | `RevogarColetorService`, `ObterColetorService` | `Coletor`, `ColetorRepository.buscar_da_empresa` |
+| 20 | ★ Detectar falhas a partir das medições do coletor (status, abertura e encerramento de ocorrências, severidade) | `collector/edgehealth_collector.py` | `POST /api/coletor/amostras` | `ReceberAmostrasService`, `RegistrarMedicaoService`, `CalcularSeveridadeService` | `Metrica`, `Falha`, `MetricaRepository.uids_existentes` |
+| 21 | Histórico de ocorrências com filtros e paginação | `frontend/src/pages/Historico.js` | `GET /api/falhas` | `ListarFalhasService` | `FalhaRepository.historico` |
+| 22 | ★ Diagnóstico lógico da ocorrência com causas prováveis e recomendações | `frontend/src/pages/Falha.js` | `GET /api/falhas/<id>` | `AnalisarFalhaService`, `ObterFalhaService` | `Diagnostico`, `DiagnosticoRepository.recomendacoes_das_regras` |
+| 23 | Registrar impacto (usuários afetados, custos diretos) e recalcular severidade | `frontend/src/pages/Falha.js` | `PUT /api/falhas/<id>/impacto` | `RegistrarImpactoService`, `CalcularSeveridadeService` | `Impacto` |
+| 24 | ★ Estimar o prejuízo financeiro da ocorrência (expediente, pessoas, grupo compartilhado) | `frontend/src/pages/Falha.js` | `GET /api/falhas/<id>` | `EstimarPrejuizoFalhaService`, `IdentificarGrupoCompartilhadoService` | `FalhaRepository.grupo_compartilhado` |
+| 25 | ★ Explicar a ocorrência com IA (Gemini) em linguagem simples | `frontend/src/pages/Falha.js` | `POST /api/falhas/<id>/explicacao-ia` | `ExplicarFalhaComIaService`, `GeminiService` | `Falha`, `Diagnostico`, `DiagnosticoRepository.recomendacoes_do_diagnostico` |
+| 26 | ★ Dashboard com estados, severidades, gráficos e ranking de dispositivos por custo | `frontend/src/pages/Dashboard.js` | `GET /api/dashboard` | `GerarDashboardService`, `ResumirPrejuizoService` | `DashboardRepository.contagem_por_status`, `RankingCustoRepository.top_dispositivos` |
+| 27 | ★ Exportar relatório ZIP (CSV de dispositivos, métricas, falhas e diagnósticos) | `frontend/src/pages/Relatorios.js` | `GET /api/relatorios/exportar` | `ExportarRelatorioService` | `RelatorioRepository.falhas_sobrepostas` |
 
 ## Arquitetura
 
+### Cliente-servidor
+
+O frontend e o backend são **aplicações separadas** que conversam somente por HTTP/JSON:
+
+- `frontend/` — cliente web (Vite + JavaScript). Em desenvolvimento roda em `http://localhost:5173`, e o Vite encaminha `/api` para o Flask (`API_PROXY_TARGET` muda o destino).
+- `backend/` — API REST Flask em `http://127.0.0.1:5000/api`. Não gera HTML de páginas: devolve JSON.
+- `collector/` — terceiro cliente da mesma API, instalado na rede da empresa, que envia medições com credencial própria.
+
+Em produção, `npm run build` gera `frontend/dist/` e o Flask serve esses arquivos estáticos junto com a API, na mesma origem (sem CORS e com o cookie de sessão protegido). Continua sendo cliente-servidor: o navegador baixa o cliente e consome a API por `fetch`.
+
 ```mermaid
 flowchart TD
-  UI["Navegador: JavaScript e Chart.js"] -->|"HTTPS, mesma origem /api"| API["Flask: sessão, autorização e regras"]
-  API --> DB["SQLite: cadastros e histórico"]
+  UI["Navegador: frontend Vite + Chart.js"] -->|"HTTPS /api (JSON)"| API["API Flask: Controller → Service → Model/Repository"]
+  API --> DB["SQLite"]
+  API -->|"HTTPS, só dados técnicos"| IA["Google Gemini"]
   COL["Coletor remoto na rede da empresa"] -->|"ICMP"| LAN["Dispositivos da rede privada"]
-  COL -->|"HTTPS de saída, credencial própria, amostras idempotentes"| API
+  COL -->|"HTTPS de saída, credencial própria"| API
   WORKER["Worker local: flask monitor"] -->|"ICMP"| NEAR["Dispositivos alcançáveis pelo servidor"]
-  WORKER -->|"mesmo pipeline: status, falhas, diagnóstico"| DB
+  WORKER -->|"mesmo pipeline de medição"| DB
 ```
 
-Backend: Flask, SQLAlchemy e Flask-Migrate/Alembic. Frontend: JavaScript em módulos ES, Vite e Chart.js. Coletor: Python, com biblioteca padrão e icmplib. SQLite é o banco validado para uma instância (ver [DEPLOY.md](docs/DEPLOY.md)).
+Um servidor na Internet não alcança `192.168.x.x` da empresa; por isso cada dispositivo é medido pelo **worker local** ou por um **coletor remoto**. O coletor só mede e envia: status, ocorrências, severidade e diagnóstico são sempre calculados no servidor, pelo mesmo `RegistrarMedicaoService`.
 
 ### API em camadas
 
 **Diagramas:**
 
-- **Diagrama de classes do domínio:** [`docs/diagrama-classes.md`](docs/diagrama-classes.md) (imagem: [`docs/img/diagrama-classes.svg`](docs/img/diagrama-classes.svg)). É gerado a partir dos Models por `docs/gerar_diagrama_classes.py`, e `backend/tests/test_diagram.py` garante que ele corresponde ao código.
-- **Fluxogramas dos casos de uso:** [`docs/fluxogramas.md`](docs/fluxogramas.md), com 5 casos de uso (3 de entrada e 2 de recuperação de dados) passando por Tela → Controller → Service → Model/Repository → Banco (imagens em [`docs/img/`](docs/img/)). `backend/tests/test_flowcharts.py` garante que toda classe e método citados existem.
+- **Diagrama de classes:** [`docs/diagrama-classes.md`](docs/diagrama-classes.md) (imagem: [`docs/img/diagrama-classes.svg`](docs/img/diagrama-classes.svg)), gerado dos Models por `docs/gerar_diagrama_classes.py`; `backend/tests/test_diagram.py` garante que corresponde ao código.
+- **Fluxogramas dos casos de uso:** [`docs/fluxogramas.md`](docs/fluxogramas.md), com 6 casos de uso (entrada e recuperação de dados, incluindo a explicação com IA) passando por Tela → Controller → Service → Model/Repository → Banco (imagens em [`docs/img/`](docs/img/)); `backend/tests/test_flowcharts.py` garante que toda classe e método citados existem.
 
 Toda funcionalidade segue o mesmo fluxo:
 
@@ -54,6 +134,7 @@ backend/
 │   ├── diagnosticos/  dashboard/  relatorios/  coletores/  coletor_api/
 │   ├── monitoramento/    sonda ICMP, classificação de status, registro de medição, lease
 │   ├── custos/           cálculo do prejuízo estimado (expediente, grupo compartilhado)
+│   ├── ia/               GeminiService (única classe que chama a IA) e limite de uso
 │   ├── privacidade/  legado/  saude/
 │   └── comum/            serialização JSON das entidades e hash de credenciais
 ├── models/               um arquivo por entidade; base.py com o CRUD comum
@@ -66,63 +147,114 @@ backend/
 | Camada | Papel | Não pode |
 | --- | --- | --- |
 | **Controller** (`controllers/`) | Recebe a requisição HTTP, lê o JSON, a query string e o usuário autenticado, chama o service e devolve a resposta (status e JSON). `rotas.py` liga cada URL e método HTTP a um método de controller, com a autenticação exigida. | Ter regra de negócio ou acessar o banco (`sqlalchemy`/`db`). |
-| **Service** (`services/`) | Um caso de uso por classe (`CadastrarDispositivoService`, `RegistrarImpactoService`, `ReceberAmostrasService`...). Valida os dados, aplica as regras e coordena models, repositories e a transação. As regras de domínio também são classes: `RegistrarMedicaoService` (status e ciclo das ocorrências), `AnalisarFalhaService` e `CalcularSeveridadeService` (diagnóstico), `CalculadoraPrejuizo` (custos) e `SondaIcmpService` (integração ICMP). Recebe usuário e empresa como parâmetros. | Ler `flask.request`/`flask.g` ou executar SQL. |
+| **Service** (`services/`) | Um caso de uso por classe (`CadastrarDispositivoService`, `RegistrarImpactoService`, `ReceberAmostrasService`...). Valida os dados, aplica as regras e coordena models, repositories e a transação. As regras de domínio também são classes: `RegistrarMedicaoService` (status e ciclo das ocorrências), `AnalisarFalhaService` e `CalcularSeveridadeService` (diagnóstico), `CalculadoraPrejuizo` (custos), `SondaIcmpService` (ICMP) e `GeminiService` (IA). Recebe usuário e empresa como parâmetros. | Ler `flask.request`/`flask.g` ou executar SQL. |
 | **Model** (`models/`) | Mapeamento de cada tabela. Todos herdam `BaseModel`, com `salvar()`, `atualizar()`, `deletar()`, `listar_todos()` e `buscar_por_id()` (`commit=False` mantém a operação na transação do caso de uso). | Conter consultas especiais ou regras de caso de uso. |
-| **Repository** (`repositories/`) | Somente consultas especiais: busca limitada à empresa (multiempresa), histórico de falhas com filtros e paginação, métricas por período, agregações do dashboard e ranking de custo (SQL com `text()`), dados do relatório (JOIN e períodos sobrepostos), dispositivos devidos para coleta, lease do dispositivo e grupo de falhas compartilhadas. `Transacao` confirma ou desfaz a transação. | Repetir o CRUD dos models. |
+| **Repository** (`repositories/`) | Somente consultas especiais (ver [Banco de dados](#banco-de-dados)). `Transacao` confirma ou desfaz a transação. | Repetir o CRUD dos models. |
 
 `tests/test_architecture.py` falha se um controller importar `sqlalchemy`/`db`, se um service usar `flask.request`/`flask.g` ou SQL, ou se faltar uma das cinco operações de CRUD na classe base dos models.
 
-### Banco de dados
+## Banco de dados
 
-`backend/database/create_database.sql` cria o banco SQLite completo (tabelas, chaves, `CHECK`, índices parciais, revisão Alembic e catálogo de recomendações). Ele é gerado a partir das migrations, e `tests/test_database_script.py` garante que os dois produzem o mesmo esquema. Detalhes, a justificativa do SQLite e a ausência de Stored Procedures estão em [backend/database/README.md](backend/database/README.md).
+Pasta [`backend/database/`](backend/database/): [`create_database.sql`](backend/database/create_database.sql) cria o banco SQLite completo (tabelas, chaves, `CHECK`, índices parciais, revisão Alembic e catálogo de recomendações). Ele é gerado das migrations por `gerar_create_database.py`, e `tests/test_database_script.py` garante que os dois produzem o mesmo esquema. Como criar o banco, justificativa do SQLite e detalhes: [`backend/database/README.md`](backend/database/README.md).
 
-### Consultas SQL dos Repositories
+**Stored Procedures:** o SQLite não tem Stored Procedures. As consultas especiais ficam nos **Repositories** (`backend/repositories/`), em SQL escrito à mão com `text()` e parâmetros nomeados ou em SQLAlchemy Core, que gera SQL parametrizado. As regras de integridade ficam no próprio banco (`FOREIGN KEY`, `UNIQUE`, `CHECK`, índices parciais).
 
-`text()` = SQL escrito à mão com parâmetros nomeados. Core = SQLAlchemy Core (`select`/`join`/`where`/`update`/`delete`), que gera SQL parametrizado. Todas as consultas são testadas com resultado esperado exato em `tests/test_repositories.py`.
+### Models
 
-| Método | O que consulta | SQL |
+| Entidade | Arquivo | Tabela |
+| --- | --- | --- |
+| `Empresa` | `backend/models/empresa.py` | `empresas` |
+| `Usuario` | `backend/models/usuario.py` | `usuarios` |
+| `AuthSession` | `backend/models/auth_session.py` | `auth_sessions` |
+| `LoginAttempt` | `backend/models/login_attempt.py` | `login_attempts` |
+| `Coletor` | `backend/models/coletor.py` | `coletores` |
+| `Dispositivo` | `backend/models/dispositivo.py` | `dispositivos` |
+| `Metrica` | `backend/models/metrica.py` | `metricas` |
+| `Falha` | `backend/models/falha.py` | `falhas` |
+| `Impacto` | `backend/models/impacto.py` | `impactos` |
+| `Diagnostico` | `backend/models/diagnostico.py` | `diagnosticos` |
+| `Recomendacao` | `backend/models/recomendacao.py` | `recomendacoes` |
+| `DiagnosticoRecomendacao` | `backend/models/diagnostico_recomendacao.py` | `diagnostico_recomendacoes` |
+| `RegistroLegado` | `backend/models/registro_legado.py` | `registros_legados` |
+
+### Consultas especiais dos Repositories
+
+`text()` = SQL escrito à mão. Core = SQLAlchemy Core (`select`/`join`/`where`/`update`/`delete`). Todas são testadas com resultado exato em `tests/test_repositories.py`.
+
+| Método | O que consulta | Tipo de SQL |
 | --- | --- | --- |
 | `DashboardRepository.contagem_por_status` | dispositivos ativos por status (`SEM_COLETA` = nunca medido) | `text()`: `COALESCE` + `GROUP BY` |
 | `DashboardRepository.contagem_por_severidade` | falhas abertas da empresa por severidade | `text()`: `JOIN` + `GROUP BY` |
 | `FalhaRepository.ranking_dispositivos` | falhas por dispositivo no período (total, abertas, indisponibilidades) | `text()`: `JOIN` + `GROUP BY` + `ORDER BY` + `LIMIT` |
-| `RankingCustoRepository.top_dispositivos` | top 5 dispositivos por prejuízo estimado (empate: maior id) | `text()`: CTE `VALUES` + `LEFT JOIN` + `ORDER BY` + `LIMIT` |
+| `RankingCustoRepository.top_dispositivos` | top 5 dispositivos por prejuízo estimado | `text()`: CTE `VALUES` + `LEFT JOIN` + `ORDER BY` + `LIMIT` |
 | `FalhaRepository.historico` | histórico filtrado por dispositivo, estado, severidade e período, paginado | Core: `JOIN` + `WHERE` + `COUNT` + `LIMIT/OFFSET` |
 | `FalhaRepository.grupo_compartilhado` | indisponibilidades da empresa na janela de correlação | Core: `JOIN` + intervalo |
 | `FalhaRepository.encerradas_desde` / `ids_anteriores_do_dispositivo` | falhas relacionadas e recorrência para o diagnóstico | Core: `JOIN` + intervalo + `LIMIT` |
 | `MetricaRepository.por_periodo` / `serie_do_dispositivo` | amostras por período e série do gráfico | Core: `JOIN` + intervalo + `COUNT` + `LIMIT` |
-| `RelatorioRepository.falhas_sobrepostas` / `metricas` | dados do relatório: falhas que se sobrepõem ao período e amostras | Core: `JOIN` + sobreposição de períodos |
+| `RelatorioRepository.falhas_sobrepostas` / `metricas` | dados do relatório: falhas sobrepostas ao período e amostras | Core: `JOIN` + sobreposição de períodos |
 | `*.buscar_da_empresa` (Dispositivo, Falha, Métrica, Coletor, Usuário, Diagnóstico) | registro por id somente da empresa logada (multiempresa) | Core: `JOIN` até `dispositivos.empresa_id` |
-| `DispositivoRepository.ids_devidos_para_coleta` | dispositivos do worker com coleta vencida, mais antigos primeiro | Core: `WHERE` + `ORDER BY` + `LIMIT` |
+| `DispositivoRepository.ids_devidos_para_coleta` | dispositivos do worker com coleta vencida | Core: `WHERE` + `ORDER BY` + `LIMIT` |
 | `DispositivoRepository.reservar_para_worker` / `reservar_para_coletor` | lease exclusivo do dispositivo (só uma requisição consegue) | Core: `UPDATE ... WHERE` atômico |
 | `RetencaoRepository.expurgar` | amostras e registros de segurança vencidos | Core: `COUNT` + `DELETE` |
 
-**Rede privada:** um servidor hospedado na Internet não alcança `192.168.x.x` da empresa. Cada dispositivo tem uma **origem da medição**:
+## Rotas da API
 
-- **worker local**, para o que o próprio servidor alcança;
-- **coletor remoto** instalado na rede da empresa ([collector/README.md](collector/README.md)).
+Todas sob o prefixo `/api`. **Acesso:** *público* = sem login; *técnico* = qualquer membro logado da empresa (o administrador também); *admin* = só administrador; *coletor* = credencial do coletor (`Authorization: Bearer ehc_...`, sem cookie). Rotas de técnico e admin exigem os Termos aceitos, exceto as de `AuthController` marcadas como técnico. Um id de outra empresa responde 404.
 
-O coletor só mede e envia. Status, ocorrências, severidade e diagnóstico são sempre calculados no servidor, pelo mesmo `RegistrarMedicaoService` usado pelo worker. O worker nunca mede um dispositivo atribuído a um coletor.
+| Controller | Método | URL | Acesso |
+| --- | --- | --- | --- |
+| `HealthController` | GET | `/api/health` | público |
+| `AuthController` | GET | `/api/termos` | público |
+| `AuthController` | POST | `/api/auth/registro` | público |
+| `AuthController` | POST | `/api/auth/login` | público |
+| `AuthController` | GET | `/api/auth/me` | técnico |
+| `AuthController` | POST | `/api/auth/aceite-termos` | técnico |
+| `AuthController` | POST | `/api/auth/logout` | técnico |
+| `EmpresaController` | GET | `/api/empresa` | técnico |
+| `EmpresaController` | PUT | `/api/empresa` | admin |
+| `EmpresaController` | PUT | `/api/empresa/custos` | admin |
+| `EmpresaController` | POST | `/api/empresa/custos/pular` | admin |
+| `UsuarioController` | GET | `/api/usuarios` | admin |
+| `UsuarioController` | POST | `/api/usuarios` | admin |
+| `UsuarioController` | PUT | `/api/usuarios/<id>` | admin |
+| `DispositivoController` | GET | `/api/dispositivos` | técnico |
+| `DispositivoController` | GET | `/api/dispositivos/<id>` | técnico |
+| `DispositivoController` | POST | `/api/dispositivos` | técnico |
+| `DispositivoController` | PUT | `/api/dispositivos/<id>` | técnico |
+| `DispositivoController` | GET | `/api/dispositivos/impacto-padrao` | técnico |
+| `DispositivoController` | DELETE | `/api/dispositivos/<id>` | técnico |
+| `DispositivoController` | POST | `/api/dispositivos/<id>/desarquivar` | técnico |
+| `DispositivoController` | POST | `/api/dispositivos/<id>/coletas` | técnico |
+| `MetricaController` | GET | `/api/metricas` | técnico |
+| `MetricaController` | GET | `/api/metricas/<id>` | técnico |
+| `FalhaController` | GET | `/api/falhas` | técnico |
+| `FalhaController` | GET | `/api/falhas/<id>` | técnico |
+| `FalhaController` | PUT | `/api/falhas/<id>/impacto` | técnico |
+| `FalhaController` | POST | `/api/falhas/<id>/explicacao-ia` | técnico |
+| `DiagnosticoController` | GET | `/api/diagnosticos/<id>` | técnico |
+| `DiagnosticoController` | GET | `/api/recomendacoes` | técnico |
+| `DashboardController` | GET | `/api/dashboard` | técnico |
+| `RelatorioController` | GET | `/api/relatorios/exportar` | técnico |
+| `ColetorController` | GET | `/api/coletores` | técnico |
+| `ColetorController` | POST | `/api/coletores` | admin |
+| `ColetorController` | POST | `/api/coletores/<id>/rotacionar` | admin |
+| `ColetorController` | POST | `/api/coletores/<id>/revogar` | admin |
+| `ColetorApiController` | GET | `/api/coletor/configuracao` | coletor |
+| `ColetorApiController` | POST | `/api/coletor/heartbeat` | coletor |
+| `ColetorApiController` | POST | `/api/coletor/amostras` | coletor |
 
-## Pré-requisitos
+Erros retornam JSON (`{"erro": ...}`) com HTTP 400/401/403/404/409/422/429/502/503 e desfazem a transação. Alterações com sessão exigem o cabeçalho CSRF.
 
-- Python 3.12 ou superior; validado em Python 3.12.14/Linux.
-- Node.js 22.12 ou superior compatível com Vite 8, e npm.
-- Acesso à LAN dos dispositivos e permissão do sistema operacional para ICMP.
-- Navegador atual.
+## Como executar
 
-## Instalação do backend
+### Pré-requisitos
 
-Na raiz do repositório, em Linux/macOS:
+- Python 3.12 ou superior e Node.js 22.12 ou superior (com npm).
+- Para medir de verdade: permissão do sistema operacional para ICMP e acesso à rede dos dispositivos.
 
-```bash
-cd backend
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements-dev.lock
-cp -n .env.example .env
-```
+### Backend
 
-Windows/PowerShell:
+Windows (PowerShell), a partir da raiz do repositório:
 
 ```powershell
 cd backend
@@ -130,224 +262,101 @@ py -3 -m venv .venv
 .venv\Scripts\Activate.ps1
 python -m pip install -r requirements-dev.lock
 if (!(Test-Path .env)) { Copy-Item .env.example .env }
-```
-
-O lock inclui runtime e ferramentas de teste do ambiente validado. `requirements.txt` contém as dependências diretas de runtime; `requirements-dev.txt`, os extras de desenvolvimento. Preserve um `.env` existente e revise seu banco antes de prosseguir.
-
-## Banco novo e migrations
-
-**Se já existe um banco do protótipo, siga [a importação legada](docs/LEGACY.md) antes de aplicar migrations.** A migration inicial não deve ser aplicada sobre tabelas antigas de mesmo nome. Não use `db stamp` para contornar incompatibilidade de schema.
-
-Dentro de `backend/`, com o ambiente virtual ativo:
-
-```bash
 python -m flask --app run.py db upgrade
 python -m flask --app run.py seed-catalog
-python -m flask --app run.py db current
-python -m flask --app run.py db check
+python -m flask --app run.py run
 ```
 
-`DATABASE_URL=sqlite:///edgehealth.db` resolve para `backend/instance/edgehealth.db`. Para caminho absoluto Linux, use quatro barras: `sqlite:////caminho/edgehealth.db`. API e worker devem usar o mesmo banco. O seed cria somente oito ações corretivas e é idempotente.
-
-- `55463d3f0b18`: entidades, sessões, FKs, constraints, índices históricos, IP ativo único por empresa e uma falha aberta por dispositivo.
-- `7c7ba005affc`: preservação separada dos registros legados, sem tratá-los como medições reais.
-
-Há integridade referencial SQLite em cada conexão e espera limitada para bloqueio de escrita. Dispositivos são arquivados; seu histórico permanece. API e worker não executam `create_all()` na inicialização.
-
-## Executar em desenvolvimento
-
-Terminal 1, dentro de `backend/`, com o ambiente virtual ativo:
+Linux/macOS:
 
 ```bash
-python run.py
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements-dev.lock
+cp -n .env.example .env
+python -m flask --app run.py db upgrade
+python -m flask --app run.py seed-catalog
+python -m flask --app run.py run
 ```
 
-Terminal 2, também em `backend/`, com o mesmo ambiente virtual:
+A API fica em `http://127.0.0.1:5000/api` (`python run.py` faz o mesmo). O `.env` nunca vai para o Git; revise-o a partir do `.env.example`. `seed-catalog` só cria o catálogo de 8 recomendações e é idempotente; não há usuários ou dispositivos de exemplo. Para o worker local medir os dispositivos, abra outro terminal no `backend/` com o mesmo ambiente virtual e rode `python -m flask --app run.py monitor`. Já existe um banco do protótipo antigo? Siga [docs/LEGACY.md](docs/LEGACY.md) antes do `db upgrade`.
 
-```bash
-python -m flask --app run.py monitor
-```
+### Frontend
 
-Terminal 3, a partir da raiz do repositório:
+Em outro terminal (igual no PowerShell e no Linux):
 
 ```bash
 cd frontend
-npm ci
+npm install
 npm run dev
 ```
 
-Abra `http://localhost:5173`. Vite encaminha `/api` para `http://127.0.0.1:5000`; `API_PROXY_TARGET` ajusta esse destino quando necessário. Cookies e requisições permanecem na mesma origem; não é necessário CORS permissivo.
+Abra `http://localhost:5173` e escolha **Cadastrar minha empresa**. Para servir sem o Vite, como em produção: `npm run build` e, no `backend/`, `waitress-serve --listen=127.0.0.1:5000 run:app` (abrir `http://localhost:5000`).
 
-O botão **Coletar** solicita agendamento e retorna HTTP 202. Quem mede é o worker. Sem ele, o botão não cria amostras nem apresenta resultado fictício.
+### Testes
 
-## Build e execução sem Vite
+```powershell
+# backend (PowerShell ou bash, com o ambiente virtual ativo)
+cd backend
+python -m pytest -q
 
-```bash
+# frontend (usa o .venv do backend para subir uma API temporária)
 cd frontend
-npm ci
-npm run build
-cd ../backend
-```
-
-Com o ambiente virtual ativo:
-
-```bash
-waitress-serve --listen=127.0.0.1:5000 run:app
-```
-
-Flask serve build e API em `http://localhost:5000`. Mantenha `python -m flask --app run.py monitor` em outro processo. Para execução contínua, supervisione ambos. Ao expor a aplicação, use HTTPS e `COOKIE_SECURE=true`; esse valor exige HTTPS para enviar o cookie. HTTP local usa `false`.
-
-## Primeiro acesso e segurança
-
-Na tela de login, escolha **Cadastrar minha empresa**. Informe empresa, CNPJ, nome, e-mail e senha de 10 a 128 caracteres, e marque o aceite dos Termos de Uso e a ciência do Aviso de Privacidade (versão e data ficam registradas; não é consentimento). Contas criadas pelo administrador aceitam os Termos no primeiro acesso. A primeira conta administra a empresa criada; cadastre a equipe em **Equipe**. Dispositivos exigem nome, IP, tipo e localização; a empresa vem da sessão.
-
-Senhas usam scrypt/Werkzeug. A sessão é opaca e aleatória, com cookie HttpOnly/SameSite e somente hashes dos tokens no banco. Alterações exigem CSRF. Logout, troca de senha, permissão ou desativação revogam sessões. Tentativas de login são limitadas de forma persistida. Não há token em localStorage.
-
-Consultas usam a empresa da sessão e validam IDs relacionados. Um ID de outra empresa retorna 404. O cliente não pode atribuir `empresa_id`, status ou métricas. Recomendações são catálogo global sem dados de empresas. Usuários comuns não administram empresa/equipe.
-
-CNPJ numérico e alfanumérico são normalizados e validados por dígito verificador, conforme o [algoritmo da Receita Federal](https://www.gov.br/receitafederal/pt-br/centrais-de-conteudo/publicacoes/perguntas-e-respostas/cnpj/cnpj-alfanumerico.pdf). Isso valida o formato, não a situação cadastral.
-
-## Configuração e coleta
-
-| Variável | Padrão | Comportamento |
-|---|---:|---|
-| `DATABASE_URL` | `sqlite:///edgehealth.db` | Banco de API e worker |
-| `COOKIE_SECURE` | `false` | Use `true` com HTTPS |
-| `SESSION_HOURS` | 8 | Validade da sessão |
-| `MONITOR_INTERVAL` | 30 s | Intervalo após concluir a coleta anterior |
-| `MONITOR_PACKETS` | 4 | Pacotes por amostra, entre 1 e 10 |
-| `MONITOR_TIMEOUT` | 1 s | Timeout por pacote, entre 0,1 e 10 s |
-| `MONITOR_WORKERS` | 4 | Concorrência, entre 1 e 16 |
-| `MONITOR_LEASE_SECONDS` | 120 s | Lease superior ao limite da sondagem com margem |
-| `OFFLINE_AFTER` | 3 | Ausências de resposta para confirmar OFFLINE |
-| `RECOVERY_AFTER` | 2 | Amostras saudáveis para confirmar recuperação |
-| `LATENCY_LIMIT_MS` | 150 ms | Limite de degradação, inclusivo |
-| `LOSS_LIMIT_PCT` | 5% | Limite de degradação, inclusivo |
-| `DIAGNOSTIC_WINDOW_SECONDS` | 300 s | Janela de correlação |
-| `STALE_AFTER_SECONDS` | 180 s | Alerta de observação ausente/desatualizada |
-
-O worker consulta vencimentos a cada até 2 s. Um lease transacional impede coleta simultânea do mesmo dispositivo, inclusive entre processos. A sondagem não mantém transação de banco aberta nem bloqueia a requisição HTTP. O lease expira após interrupção do processo. Não há scheduler iniciado pelo reloader web.
-
-`icmplib.ping` recebe IP validado, quantidade, timeout e intervalo de 0,2 s entre pacotes. Latência vem das respostas recebidas; perda é `(enviados - recebidos) / enviados * 100`. Sem resposta, latência é `null`. Erros de permissão/configuração não equivalem à indisponibilidade do alvo e não criam amostras ou falhas de rede.
-
-O status inicial é desconhecido: **Aguardando coleta**. Depois, ONLINE exige respostas dentro dos limites e confirmação de recuperação quando necessária; INSTAVEL representa degradação, primeiras ausências ou recuperação em confirmação; OFFLINE exige três amostras consecutivas sem resposta por padrão. Cada amostra preserva conectividade bruta, timestamp UTC, latência, contagens, perda e estado resultante.
-
-Sondagem real sem persistência e execução de um único ciclo vencido:
-
-```bash
-python -m flask --app run.py probe 127.0.0.1
-python -m flask --app run.py monitor --once
-```
-
-Erro de permissão ICMP requer adequação pelo operador do ambiente; não há fallback de números fixos. Um equipamento pode bloquear ICMP mesmo operacional, hipótese explicitada pelo diagnóstico.
-
-## Falhas, impacto e diagnóstico
-
-Anomalia abre uma ocorrência; ciclos seguintes atualizam a mesma falha. A confirmação de recuperação a encerra. Queda posterior cria outra. Arquivamento encerra com motivo ARQUIVAMENTO, distinto de RECUPERACAO.
-
-A duração automática é o intervalo observado da **ocorrência**, incluindo instabilidade e confirmação de recuperação, limitado à precisão das sondagens. Não é medição contínua exata de downtime. Usuários afetados começam desconhecidos e podem ser informados na tela, com origem manual e observação.
-
-Severidade usa o maior nível aplicável, com thresholds centralizados em `app/config.py`: BAIXA para instabilidade inicial; MEDIA após 5 minutos ou indisponibilidade confirmada; ALTA após 15 minutos, três dispositivos temporalmente relacionados ou 10 usuários informados; CRITICA após 60 minutos ou 50 usuários. A justificativa e a data de cálculo são persistidas. Coletas e alteração do impacto recalculam o nível.
-
-O diagnóstico considera até 20 amostras recentes, pares da mesma empresa com observação recente e até 20 ocorrências anteriores dos últimos sete dias. Regras: problema localizado, interrupção possivelmente compartilhada, congestionamento/instabilidade, latência e recorrência. Causas são hipóteses; topologia não é presumida. Sem evidência, informa insuficiência. Evidências, versão, momento e recomendações são persistidos. A recuperação conserva a última explicação da anomalia no histórico.
-
-## Explicar ocorrência com IA (opcional)
-
-Na tela da ocorrência, **Explicar com IA** gera, em português simples para um gestor, o que aconteceu, o impacto provável e os próximos passos, a partir do diagnóstico e das recomendações que o sistema já calculou. A IA explica; o diagnóstico por regras não muda.
-
-- Fluxo: `Falha.js` → `POST /api/falhas/<id>/explicacao-ia` → `FalhaController.explicar_com_ia` → `ExplicarFalhaComIaService` → `GeminiService` (única classe que conversa com a API do Gemini). Fluxograma 6 em [`docs/fluxogramas.md`](docs/fluxogramas.md).
-- Configuração no `backend/.env` (nunca no Git): `GEMINI_API_KEY` (sem ela o botão aparece desabilitado), `GEMINI_MODEL` (padrão `gemini-3.8-flash`) e `IA_EXPLICACOES_POR_HORA` (padrão 10 por empresa).
-- Privacidade: só dados técnicos são enviados, nunca nomes, e-mails, CNPJ, nome da empresa ou IP ([`docs/LGPD.md`](docs/LGPD.md), seção 6).
-- Erros: sem chave **503**; cota, rede ou timeout de 20 s **503**; chave inválida ou resposta vazia **502**; limite por empresa **429**.
-
-## Dashboard e relatórios
-
-Métricas são paginadas, cronológicas e filtráveis por dispositivo/período/tipo. Histórico filtra dispositivo, período, severidade e estado. Filtros usam UTC; `fim` com apenas data inclui o dia inteiro. Se somente `fim` for informado, o início padrão é relativo a ele.
-
-Dashboard atualiza a cada 15 s: inventário, estados, falhas abertas, severidades, recentes e séries de latência/perda de um dispositivo. Indicadores representam o estado atual; período aplica-se aos gráficos. Exibe até 500 amostras mais recentes e informa o total, mantendo lacunas de latência desconhecida.
-
-Relatórios geram ZIP com `dispositivos.csv`, `metricas.csv`, `falhas.csv`, `diagnosticos.csv` e `leia-me.json`. CSV UTF-8 com BOM, delimitador `;`, datas UTC, proteção contra fórmulas e JSON para evidências/causas/impacto/recomendações. Inclui somente a empresa autenticada. Inventário inclui arquivados; falhas incluem ocorrências sobrepostas ao intervalo; diagnóstico é a última análise disponível. Padrão: 30 dias. Acima de 50.000 registros por seção, reduza o período.
-
-## API
-
-| Método | Rota | Finalidade |
-|---|---|---|
-| GET | `/api/health` | Banco e migrations; 503 se pendentes |
-| POST | `/api/auth/registro`, `/api/auth/login` | Cadastro inicial / sessão |
-| GET / POST | `/api/auth/me` / `/api/auth/logout` | Contexto / revogação |
-| GET / PUT | `/api/empresa` | Empresa atual; escrita administrativa |
-| GET / POST / PUT | `/api/usuarios`, `/api/usuarios/{id}` | Equipe; acesso administrativo |
-| GET / POST | `/api/dispositivos` | Inventário / criação |
-| GET / PUT / DELETE | `/api/dispositivos/{id}` | Consulta / edição / arquivamento |
-| POST | `/api/dispositivos/{id}/coletas` | Agendamento, HTTP 202 |
-| GET | `/api/metricas`, `/api/metricas/{id}` | Histórico e amostra |
-| GET | `/api/falhas`, `/api/falhas/{id}` | Histórico e detalhe |
-| PUT | `/api/falhas/{id}/impacto` | Estimativa e recálculo |
-| GET | `/api/diagnosticos/{id}`, `/api/recomendacoes` | Análise e catálogo |
-| GET | `/api/dashboard`, `/api/relatorios/exportar` | Dashboard / ZIP |
-| GET / POST | `/api/termos`, `/api/auth/aceite-termos` | Versão vigente / aceite dos Termos |
-| GET / POST | `/api/coletores` | Lista (todos os membros) / cadastro com credencial exibida uma vez (admin) |
-| POST | `/api/coletores/{id}/rotacionar`, `/api/coletores/{id}/revogar` | Nova credencial / revogação (admin) |
-| GET | `/api/coletor/configuracao` | **Coletor** (Bearer): dispositivos atribuídos e parâmetros |
-| POST | `/api/coletor/amostras`, `/api/coletor/heartbeat` | **Coletor**: lote idempotente de amostras e erros / sinal de vida |
-
-Exceto health, termos, registro, login e as rotas `/api/coletor/*` (credencial `Authorization: Bearer ehc_...`, sem cookie e sem CSRF), as rotas exigem sessão. Contas com Termos pendentes recebem 403 até aceitar. Lotes têm limite de 200 itens, 512 KB e 120 requisições/min por coletor. Não há escrita manual de métricas/status/falhas. Erros comuns retornam JSON e HTTP 400/401/403/404/409/422/429, com rollback das alterações inconsistentes.
-
-## Testes
-
-Em `backend/`, com o ambiente virtual ativo:
-
-```bash
-python -m pytest --cov=app --cov-report=term-missing -q
-```
-
-Em `frontend/`, após instalar dependências do backend:
-
-```bash
-npm ci
 npm test
 ```
 
-`npm test` gera o build e inicia uma API HTTP e SQLite temporários, aplica migrations, envia formulários e verifica respostas reais, datasets dos gráficos, exportação, build servido pelo Flask e proxy Vite. Usa `.venv` do backend; `EDGEHEALTH_PYTHON` pode apontar para outro Python com dependências. Testes DOM usam jsdom, não substituem homologação visual nos navegadores finais.
+Teste opcional de ICMP real (loopback): `EDGEHEALTH_TEST_REAL_NETWORK=1 python -m pytest -m real_network -q` no bash, ou `$env:EDGEHEALTH_TEST_REAL_NETWORK='1'; python -m pytest -m real_network -q` no PowerShell.
 
-Probes controlados existem somente nos testes, passando pelo pipeline de persistência. Não há endpoint HTTP ou variável de produção para simular medições.
+Variáveis de configuração (limites de latência e perda, intervalo de coleta, retenção etc.) estão comentadas em `backend/.env.example`; produção em [docs/DEPLOY.md](docs/DEPLOY.md).
 
-Teste opcional ICMP real, somente loopback, Linux/macOS:
+## Coletor remoto
 
-```bash
-EDGEHEALTH_TEST_REAL_NETWORK=1 python -m pytest -m real_network -q
-```
+O coletor roda dentro da rede da empresa, mede os dispositivos atribuídos a ele e envia as amostras por HTTPS de saída (fila em disco quando a Internet cai). Instalação, comandos e segurança: [collector/README.md](collector/README.md).
 
-PowerShell:
+- Windows: baixe o [`EdgeHealthColetor.exe`](https://github.com/MarceloRodriguesDoNascimento/EdgeHealth/releases/latest/download/EdgeHealthColetor.exe) da [página de Releases](https://github.com/MarceloRodriguesDoNascimento/EdgeHealth/releases/latest) (confira o SHA-256 publicado lá) ou use **Coletores → Baixar coletor para Windows** no site.
+- Linux/macOS ou Python: `python collector/edgehealth_collector.py --api-url <URL do servidor> --token-file coletor.token`.
 
-```powershell
-$env:EDGEHEALTH_TEST_REAL_NETWORK='1'
-python -m pytest -m real_network -q
-Remove-Item Env:EDGEHEALTH_TEST_REAL_NETWORK
-```
+A credencial é criada em **Coletores** (admin), mostrada uma única vez e nunca gravada em log.
 
-Sem a variável, os 2 testes reais são pulados. Em 06/10/2026, ambos passaram nesta máquina Windows: sondagem de loopback, e o coletor remoto medindo o loopback e enviando ao servidor por HTTP. Em 09/09/2026, outro ambiente havia recusado o socket (`SocketPermissionError`). Aprovar sondagens controladas não aprova o ICMP real de cada máquina: rode o teste em cada coletor.
+## Explicar ocorrência com IA
 
-O que cada suíte cobre:
+Na tela da ocorrência, **Explicar com IA** gera, em português simples para um gestor, o que aconteceu, o impacto provável e os próximos passos, a partir do diagnóstico e das recomendações que o sistema já calculou. A IA explica; o diagnóstico por regras não muda.
 
-- `test_collectors.py`: credenciais do coletor, isolamento, idempotência, amostras fora de ordem, validação, permissão ICMP, coletor desatualizado, limite de taxa e concorrência.
-- `test_collector_client.py`: o cliente real contra um servidor HTTP real, com queda da API, fila em disco, reinício, ciclo de falha e revogação.
-- `test_privacy_operations.py`: retenção, anonimização, backup, cookies `Secure` e proxy.
+- Fluxo: `Falha.js` → `POST /api/falhas/<id>/explicacao-ia` → `FalhaController.explicar_com_ia` → `ExplicarFalhaComIaService` → `GeminiService`. Fluxograma 6 em [`docs/fluxogramas.md`](docs/fluxogramas.md).
+- Configuração no `backend/.env` (nunca no Git): `GEMINI_API_KEY` (sem ela o botão aparece desabilitado), `GEMINI_MODEL` (padrão `gemini-3.5-flash-lite`) e `IA_EXPLICACOES_POR_HORA` (padrão 10 por empresa).
+- Privacidade: só dados técnicos são enviados, nunca nomes, e-mails, CNPJ, nome da empresa ou IP ([`docs/LGPD.md`](docs/LGPD.md), seção 6).
+- Erros: sem chave **503**; cota, rede, modelo sobrecarregado ou timeout de 20 s **503**; chave inválida ou resposta vazia **502**; limite por empresa **429**.
 
-## Limites conhecidos
+## Hospedagem
 
-RF01–RF20 estão implementados e testados. O ICMP real foi validado em laboratório (loopback e gateway da LAN de teste). Falta homologar na rede da empresa usada na demonstração, com queda e recuperação controladas de um equipamento autorizado ([DEMO.md](docs/DEMO.md)). Não há dados simulados em produção.
+A aplicação está publicada em **<https://marcelodomingos.pythonanywhere.com>** (PythonAnywhere, plano gratuito: o Flask serve a API e o build do frontend). Passo a passo da implantação, atualização e limites do plano: [docs/PYTHONANYWHERE.md](docs/PYTHONANYWHERE.md); outras opções de hospedagem: [docs/DEPLOY.md](docs/DEPLOY.md).
 
-O MVP mede a partir de um ponto de rede por dispositivo. Ele não descobre topologia nem calcula usuários automaticamente. Amostras brutas seguem retenção de 180 dias (`flask purge-history`). PostgreSQL, múltiplas instâncias e a imagem Docker não foram executados. A aplicação está pronta para implantação, mas **não está implantada nem acessível publicamente**. CSV atende RF20; PDF/XLSX não fazem parte desta entrega. As minutas jurídicas ([Termos](frontend/public/termos.html), [Privacidade](frontend/public/privacidade.html), [LGPD.md](docs/LGPD.md)) precisam de revisão pelos responsáveis.
+As **credenciais de demonstração são entregues ao professor pelo Google Classroom**. Este repositório é público: nenhuma senha, e-mail de conta, chave de API ou credencial de coletor fica no código ou na documentação.
 
-## Operação, hospedagem e privacidade
+## Testes e status
 
-Dentro de `backend/`, com o ambiente virtual ativo:
+Validação de 09/10/2026 (Windows 11, Python 3.12.10, Node 24):
 
-```bash
-python -m flask --app run.py backup --output CAMINHO_DO_BACKUP.db   # cópia consistente, nunca sobrescreve
-python -m flask --app run.py purge-history --dry-run                 # retenção (padrão 180 dias)
-python -m flask --app run.py anonymize-user --email PESSOA --yes     # pedido de titular
-```
+- **Backend:** 184 testes aprovados e 3 pulados (os opcionais de ICMP real).
+- **Frontend:** 20 de 20 aprovados (jsdom, API HTTP real temporária, build servido pelo Flask, proxy Vite e telas responsivas).
 
-Hospedagem, Docker, variáveis de produção, restauração e atualização: [docs/DEPLOY.md](docs/DEPLOY.md). Inventário de dados, bases legais sugeridas, titulares e incidentes: [docs/LGPD.md](docs/LGPD.md).
+As suítes cobrem também a documentação: `test_readme.py` (esta tabela de funcionalidades e as rotas), `test_flowcharts.py`, `test_diagram.py`, `test_database_script.py` e `test_architecture.py`.
+
+Limites conhecidos: o MVP mede de um ponto de rede por dispositivo, não descobre topologia; usuários afetados são estimados pela equipe; o diagnóstico aponta hipóteses, não certezas. As minutas jurídicas ([Termos](frontend/public/termos.html), [Privacidade](frontend/public/privacidade.html), [LGPD.md](docs/LGPD.md)) precisam de revisão pelos responsáveis.
+
+## Documentação complementar
+
+| Documento | Conteúdo |
+| --- | --- |
+| [docs/diagrama-classes.md](docs/diagrama-classes.md) | Diagrama de classes do domínio |
+| [docs/fluxogramas.md](docs/fluxogramas.md) | Fluxogramas dos 6 casos de uso |
+| [backend/database/README.md](backend/database/README.md) | Script do banco, SQLite e Stored Procedures |
+| [docs/PYTHONANYWHERE.md](docs/PYTHONANYWHERE.md) | Hospedagem gratuita usada na demonstração |
+| [docs/DEPLOY.md](docs/DEPLOY.md) | Produção, variáveis, backup e restauração |
+| [docs/LGPD.md](docs/LGPD.md) | Inventário de dados, bases legais, operadores (Google, PythonAnywhere) |
+| [docs/DEMO.md](docs/DEMO.md) | Roteiro de demonstração |
+| [docs/LEGACY.md](docs/LEGACY.md) | Importação do banco do protótipo |
+| [collector/README.md](collector/README.md) | Coletor remoto e executável Windows |
+
+Operação do servidor (no `backend/`, com o ambiente virtual ativo): `flask --app run.py backup --output CAMINHO.db` (cópia consistente), `flask --app run.py purge-history --dry-run` (retenção de 180 dias) e `flask --app run.py anonymize-user --email PESSOA --yes` (pedido de titular).
