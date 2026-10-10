@@ -5,6 +5,8 @@ from .base import BaseModel, DecimalText, utcnow
 
 class Empresa(BaseModel):
     __tablename__ = 'empresas'
+    FATOR_ENCARGOS_PADRAO = Decimal('1.7')  # typical charges and benefits (INSS, FGTS, vacation, 13th)
+    HORAS_MES_PADRAO = 220  # 44 h a week
     id = db.Column(db.Integer, primary_key=True)
     nome_fantasia = db.Column(db.String(150), nullable=False)
     cnpj = db.Column(db.String(14), nullable=False, unique=True)
@@ -13,8 +15,8 @@ class Empresa(BaseModel):
     criada_em = db.Column(db.DateTime, nullable=False, default=utcnow)
     # Costs for the financial loss estimate (services/custos). NULL salary: not configured.
     salario_medio = db.Column(DecimalText())
-    fator_encargos = db.Column(DecimalText(), nullable=False, default=Decimal('1.7'), server_default='1.7')
-    horas_mes = db.Column(db.Integer, nullable=False, default=220, server_default='220')
+    fator_encargos = db.Column(DecimalText(), nullable=False, default=FATOR_ENCARGOS_PADRAO, server_default='1.7')
+    horas_mes = db.Column(db.Integer, nullable=False, default=HORAS_MES_PADRAO, server_default='220')
     total_funcionarios = db.Column(db.Integer)
     expediente_dias = db.Column(db.String(7), nullable=False, default='12345', server_default='12345')  # ISO weekdays
     expediente_inicio = db.Column(db.String(5), nullable=False, default='08:00', server_default='08:00')
