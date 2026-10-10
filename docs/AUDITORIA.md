@@ -13,7 +13,7 @@ Legenda: ✅ atendido · ⚠️ atendido com ressalva · ❌ não atendido.
 | **Fluxo do sistema** — funcionalidades principais não-CRUD de ponta a ponta | 4/4 | 7 funcionalidades ★ no README (detecção de falhas pelo coletor, diagnóstico com recomendações, prejuízo estimado, explicação com IA, dashboard com ranking de custo, relatório ZIP). Todas chamadas **em produção** em 09/10/2026 (tabela [Produção](#produção-0910-2026)). | ✅ | — |
 | **Cliente-servidor** — servidores separados (2) | 2/2 | `frontend/` (Vite) e `backend/` (Flask) são aplicações separadas. Prova: Vite escutando em `:5173` (PID 21272) e Flask em `:5000` (PID 21596) ao mesmo tempo (`netstat`). | ✅ | — |
 | **Cliente-servidor** — frontend consome a API por requisições (2) | 2/2 | `frontend/src/services/api.js` usa `fetch('/api…')`; `curl :5173/api/health` → 200 JSON, e o log do Flask registrou `GET /api/health` vindo do Vite. Comandos no README, seção "Cliente-servidor". | ✅ | — |
-| **Camadas** — Controllers recebem e acionam casos de uso (1) | 1/1 | `backend/controllers/`: 12 classes, uma por recurso, herdando `BaseController`; `rotas.py` liga URL → método. Nenhum importa `db`/`sqlalchemy` (`tests/test_architecture.py`). | ✅ | Ressalva menor: ver ponto fraco 3. |
+| **Camadas** — Controllers recebem e acionam casos de uso (1) | 1/1 | `backend/controllers/`: 12 classes, uma por recurso, herdando `BaseController`; `rotas.py` liga URL → método. Nenhum importa `db`/`sqlalchemy` (`tests/test_architecture.py`). | ✅ | Cada método chama um único Service (`test_architecture.py`). |
 | **Camadas** — Services por caso de uso e regras (3) | 3/3 | `backend/services/<recurso>/`: um caso de uso por classe com `executar()` (ex.: `CadastrarDispositivoService`, `RegistrarImpactoService`, `ExplicarFalhaComIaService`). Métodos extras são auxiliares do mesmo caso (`ObterFalhaService.buscar`, `GeminiService.disponivel`). Services não leem `flask.request`/`g` nem executam SQL (`test_architecture.py`). | ✅ | — |
 | **Camadas** — Models (1) | 1/1 | `backend/models/`: 13 entidades, um arquivo cada, herdando `BaseModel(db.Model)` com `salvar`, `atualizar`, `deletar`, `listar_todos`, `buscar_por_id` (+ `buscar_um_por`). Uso nos services: `salvar` 19×, `atualizar` 15×, `buscar_por_id` 25×, `deletar` 1×, `listar_todos` 1×. | ✅ | — |
 | **Camadas** — Repositories com responsabilidade definida (1) | 1/1 | `backend/repositories/`: só consultas especiais (multiempresa, histórico paginado, agregações, ranking, lease, retenção) e `Transacao`. Nenhum método repete o CRUD da base; todos os métodos públicos são usados (varredura de referências). | ✅ | — |
@@ -80,7 +80,7 @@ Nenhum afeta a nota estimada, mas um professor exigente pode apontar:
 
 1. **Fórmula do custo/hora repetida no frontend** (`frontend/src/pages/Empresa.js`, `hourlyPreview`): a prévia ao digitar recalcula `salário × fator ÷ horas` no navegador. O valor salvo e usado em todo cálculo vem do servidor (`CalculadoraPrejuizo.custo_hora`). Correção completa exige uma rota nova de prévia, por isso **não foi feita sem aprovação**.
 2. **Padrões repetidos no frontend** (`Empresa.js`): com o campo vazio, envia fator `1.7` e `220` h, os mesmos padrões do Model `Empresa`. Mudar para "não enviar" alteraria o comportamento (manteria o valor anterior em vez de voltar ao padrão); **não foi feito**.
-3. **Controller chamando dois Services** (`FalhaController.registrar_impacto` e `explicar_com_ia`): busca a ocorrência com `ObterFalhaService.buscar` antes do caso de uso, para responder 404 antes de erros de payload. É coordenação de requisição, não regra de negócio, mas pode ser questionado. Alternativa: mover a busca para dentro dos dois Services.
+3. ~~**Controller chamando dois Services**~~ — ✅ **corrigido**. `FalhaController.registrar_impacto` e `explicar_com_ia` agora chamam um único Service, que recebe o id e o corpo JSON, busca a ocorrência primeiro (`ObterFalhaService.buscar`) e só depois valida o payload, mantendo o 404 de outra empresa antes do 400. Regra nova em `tests/test_architecture.py` (`test_each_controller_method_calls_a_single_service`) e regressão da ordem em `tests/test_costs.py`; fluxogramas 3 e 6 atualizados.
 4. **Capturas de página inteira**: o menu lateral não acompanha a altura total da página na captura (só na captura; na tela real ele é fixo).
 
 Código morto: nenhum resto de `app/api.py`, `app/models.py` ou `app/services/` (nem `__pycache__` órfão); nenhuma classe ou método de Repository sem uso.
@@ -94,9 +94,10 @@ Código morto: nenhum resto de `app/api.py`, `app/models.py` ou `app/services/` 
 
 ## Depende da equipe
 
-- [ ] **Vídeo de até 5 minutos** (obrigatório): pitch (problema, público, solução) + demonstração das ★. Roteiro-base: `tests/lab/demo_5min.md` e [docs/DEMO.md](DEMO.md).
+- [ ] **Vídeo de até 5 minutos** (obrigatório): pitch (problema, público, solução) + demonstração das ★. Roteiro cronometrado: [docs/ROTEIRO_VIDEO.md](ROTEIRO_VIDEO.md).
 - [ ] **Slides e pitch** para 07/11 (as imagens de `docs/img/` servem para os slides).
 - [ ] **Ensaio** com cronômetro, incluindo um plano B se a Internet falhar (vídeo gravado).
 - [ ] **Renovar o PythonAnywhere antes de 07/11** (aba Web → "Run until 3 months from today").
 - [ ] **Entregar as credenciais de demonstração ao professor pelo Classroom** (nunca no repositório).
-- [ ] Decidir sobre os pontos fracos 1 a 3 (se quiserem corrigir antes de 23/10).
+- [ ] Decidir sobre os pontos fracos 1 e 2 (se quiserem corrigir antes de 23/10).
+- [ ] Gravar o vídeo seguindo [docs/ROTEIRO_VIDEO.md](ROTEIRO_VIDEO.md).

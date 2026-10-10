@@ -1,5 +1,6 @@
 from flask import g, jsonify, request
 from werkzeug.exceptions import BadRequest
+from app import validation as v
 
 
 class BaseController:
@@ -10,16 +11,13 @@ class BaseController:
         """JSON object with only the allowed fields and every required one filled."""
         if not request.is_json:
             raise BadRequest('Envie um objeto JSON.')
-        data = request.get_json()
-        if not isinstance(data, dict):
-            raise BadRequest('Envie um objeto JSON.')
-        unknown = set(data) - set(permitidos)
-        if unknown:
-            raise BadRequest('Campos não permitidos: ' + ', '.join(sorted(unknown)))
-        for field in obrigatorios:
-            if field not in data or data[field] is None or data[field] == '':
-                raise BadRequest(f'O campo {field} é obrigatório.')
-        return data
+        return v.json_object(request.get_json(), permitidos, obrigatorios)
+
+    @staticmethod
+    def corpo():
+        """Raw JSON body (None if absent or invalid), for a service that must look the resource up
+        before validating the payload (404 of another company comes before 400)."""
+        return request.get_json(silent=True) if request.is_json else None
 
     @staticmethod
     def parametro(nome, padrao=None):

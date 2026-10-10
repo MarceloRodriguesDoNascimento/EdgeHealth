@@ -1,7 +1,9 @@
 from flask import current_app
 from werkzeug.exceptions import ServiceUnavailable
+from app import validation as v
 from models import Dispositivo, iso, utcnow
 from services.comum.serializador import Serializador
+from services.falhas.obter_falha_service import ObterFalhaService
 from services.ia.gemini_service import GeminiService
 from services.ia.limite_uso_ia import LimiteUsoIa
 
@@ -24,7 +26,9 @@ class ExplicarFalhaComIaService:
     def __init__(self, gemini=None):
         self.gemini = gemini or GeminiService()
 
-    def executar(self, empresa_id, falha):
+    def executar(self, empresa_id, id, dados):
+        falha = ObterFalhaService().buscar(empresa_id, id)  # 404 of another company before payload errors
+        v.json_object(dados, ())  # the request carries no fields: the prompt is never taken from the client
         if not GeminiService.disponivel():
             raise ServiceUnavailable(GeminiService.SEM_CHAVE)
         LimiteUsoIa.registrar(empresa_id, current_app.config['IA_EXPLICACOES_POR_HORA'])
