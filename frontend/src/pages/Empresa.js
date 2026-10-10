@@ -4,11 +4,24 @@ import { apiFetch,json } from '../services/api.js';
 const DAYS=[[1,'Seg'],[2,'Ter'],[3,'Qua'],[4,'Qui'],[5,'Sex'],[6,'Sáb'],[7,'Dom']];
 const fmt=(n,d=0)=>Number(n).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:2});
 
-// Preview only: the server computes the authoritative value (exact decimal) after saving.
-export function hourlyPreview(salary,factor,hours){
-  const s=Number(moneyInput(salary)),f=Number(moneyInput(factor)),h=Number(hours);
-  if(!(s>0&&f>0&&h>0))return 'Informe o salário médio para ver o custo por hora estimado.';
-  return `Custo por hora estimado: ${brl(s*f/h)} (${fmt(s)} × ${fmt(f,1)} ÷ ${fmt(h)})`;
+const HINT='Informe o salário médio para ver o custo por hora estimado.';
+
+// The server computes the cost per hour (same formula used everywhere); the page only shows the answer.
+export function costPreview(){
+  let seq=0,timer;
+  return (salary,factor,hours,show)=>{
+    clearTimeout(timer);const mine=++seq;
+    const salario_medio=moneyInput(salary);
+    if(!(Number(salario_medio)>0)){show(HINT);return Promise.resolve();}
+    return new Promise(resolve=>{timer=setTimeout(async()=>{
+      try{
+        const r=await apiFetch('/empresa/custos/previa',{method:'POST',body:json({salario_medio,
+          fator_encargos:moneyInput(factor),horas_mes:hours===''?null:Number(hours)})});
+        if(mine===seq)show(`Custo por hora estimado: ${brl(r.custo_hora)} (${fmt(r.salario_medio)} × ${fmt(r.fator_encargos,1)} ÷ ${fmt(r.horas_mes)})`);
+      }catch(e){if(mine===seq)show(e.message);}
+      resolve();
+    },300);});
+  };
 }
 
 export async function Empresa(session) {
@@ -42,7 +55,8 @@ function costsPanel(company,session,admin){
   const days=el('fieldset',{className:'day-picker full'},el('legend',{},'Dias de expediente'),
     DAYS.map(([d,name])=>el('label',{className:'checkbox'},el('input',{type:'checkbox',name:'dias',value:String(d),checked:c.expediente.dias.includes(d)}),name)));
   const preview=el('p',{className:'cost-preview full',role:'status','aria-live':'polite'});
-  const update=()=>{preview.textContent=hourlyPreview(salary.value,factor.value,hours.value);};
+  const ask=costPreview();
+  const update=()=>ask(salary.value,factor.value,hours.value,text=>{preview.textContent=text;});
   [salary,factor,hours].forEach(i=>i.addEventListener('input',update));update();
   const node=form([
     label('Salário médio mensal (R$)',salary),label('Total de funcionários',people),

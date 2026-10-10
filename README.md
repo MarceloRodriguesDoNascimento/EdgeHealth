@@ -246,6 +246,7 @@ Todas sob o prefixo `/api`. **Acesso:** *público* = sem login; *técnico* = qua
 | `EmpresaController` | GET | `/api/empresa` | técnico |
 | `EmpresaController` | PUT | `/api/empresa` | admin |
 | `EmpresaController` | PUT | `/api/empresa/custos` | admin |
+| `EmpresaController` | POST | `/api/empresa/custos/previa` | admin |
 | `EmpresaController` | POST | `/api/empresa/custos/pular` | admin |
 | `UsuarioController` | GET | `/api/usuarios` | admin |
 | `UsuarioController` | POST | `/api/usuarios` | admin |
@@ -371,7 +372,7 @@ As **credenciais de demonstração são entregues ao professor pelo Google Class
 
 Validação de 09/10/2026 (Windows 11, Python 3.12.10, Node 24):
 
-- **Backend:** 186 testes aprovados e 3 pulados (os opcionais de ICMP real).
+- **Backend:** 187 testes aprovados e 3 pulados (os opcionais de ICMP real).
 - **Frontend:** 20 de 20 aprovados (jsdom, API HTTP real temporária, build servido pelo Flask, proxy Vite e telas responsivas).
 
 As suítes cobrem também a documentação: `test_readme.py` (tabela de funcionalidades, rotas e links), `test_flowcharts.py`, `test_diagram.py`, `test_database_script.py` e `test_architecture.py`.

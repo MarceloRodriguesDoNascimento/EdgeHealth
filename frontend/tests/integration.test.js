@@ -104,6 +104,7 @@ test('interface completa usa a API HTTP e SQLite migrado, sem respostas HTTP sim
     // Costs: live cost-per-hour preview, then saved as exact decimals (all day, every day: deterministic tests).
     const costs=document.querySelector('#custos');
     const salary=costs.querySelector('[name=salario_medio]');salary.value='3.000,00';salary.dispatchEvent(new Event('input'));
+    for(let i=0;i<50&&!/R\$/.test(costs.querySelector('.cost-preview').textContent);i++)await new Promise(r=>setTimeout(r,100));
     assert.match(costs.querySelector('.cost-preview').textContent,/Custo por hora estimado: R\$\s23,18 \(3\.000 × 1,7 ÷ 220\)/);
     costs.querySelectorAll('[name=dias]').forEach(box=>{box.checked=true;});
     await submit({salario_medio:'3.000,00',total_funcionarios:'40',inicio:'00:00',fim:'23:59'},costs);

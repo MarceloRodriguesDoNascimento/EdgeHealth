@@ -63,6 +63,19 @@ def test_cost_per_hour_is_computed_from_salary_charges_and_hours(configured):
     assert c['assistente'] == 'CONCLUIDO'
 
 
+def test_cost_preview_uses_the_server_formula_and_model_defaults_without_saving(signed):
+    h = auth_headers(signed)
+    r = signed.post('/api/empresa/custos/previa', json={'salario_medio': '3000.00', 'fator_encargos': None, 'horas_mes': None}, headers=h)
+    assert r.status_code == 200, r.json
+    assert r.json == {'custo_hora': '23.18', 'salario_medio': '3000.00', 'fator_encargos': '1.7', 'horas_mes': 220}
+    r = signed.post('/api/empresa/custos/previa', json={'salario_medio': '4000', 'fator_encargos': '2', 'horas_mes': 160}, headers=h)
+    assert r.json['custo_hora'] == '50.00'
+    assert signed.post('/api/empresa/custos/previa', json={'salario_medio': ''}, headers=h).json['custo_hora'] is None
+    assert signed.post('/api/empresa/custos/previa', json={'salario_medio': '-1'}, headers=h).status_code == 400
+    assert signed.post('/api/empresa/custos/previa', json={'horas_mes': 0, 'salario_medio': '1'}, headers=h).status_code == 400
+    assert signed.get('/api/empresa').json['custos']['configurado'] is False  # nothing saved
+
+
 def test_incident_entirely_inside_working_hours(app, configured, device):
     fid = make_failure(app, device['id'], WED.replace(hour=13), WED.replace(hour=15), users=25, loss=100, direct='250')
     e = estimate(app, fid)
@@ -161,6 +174,7 @@ def test_technician_sees_but_cannot_edit_company_costs(app, configured):
     assert tech.get('/api/empresa').json['custos']['custo_hora'] == '23.18'
     assert tech.put('/api/empresa/custos', json={'salario_medio': '1'}, headers=auth_headers(tech)).status_code == 403
     assert tech.post('/api/empresa/custos/pular', json={}, headers=auth_headers(tech)).status_code == 403
+    assert tech.post('/api/empresa/custos/previa', json={'salario_medio': '1'}, headers=auth_headers(tech)).status_code == 403
 
 
 def test_other_company_cannot_see_or_change_the_estimate(app, configured, device):
