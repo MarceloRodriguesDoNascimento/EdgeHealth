@@ -169,6 +169,12 @@ def test_other_company_cannot_see_or_change_the_estimate(app, configured, device
     assert register(other, email='admin@b.example', cnpj='11444777000161', name='Empresa B').status_code == 201
     assert other.get(f'/api/falhas/{fid}').status_code == 404
     assert other.put(f'/api/falhas/{fid}/impacto', json={'custos_diretos': '1'}, headers=auth_headers(other)).status_code == 404
+    # 404 comes before payload errors: another company learns nothing about the incident from a 400
+    for body in ({'campo_invalido': 1}, {'custos_diretos': '-1'}, ['nao', 'objeto']):
+        assert other.put(f'/api/falhas/{fid}/impacto', json=body, headers=auth_headers(other)).status_code == 404
+    assert other.post(f'/api/falhas/{fid}/explicacao-ia', json={'prompt': 'x'}, headers=auth_headers(other)).status_code == 404
+    assert configured.put(f'/api/falhas/{fid}/impacto', json={'campo_invalido': 1}, headers=auth_headers(configured)).status_code == 400
+    assert configured.put('/api/falhas/999999/impacto', json={'campo_invalido': 1}, headers=auth_headers(configured)).status_code == 404
     assert other.put(f'/api/dispositivos/{device["id"]}', json={'usuarios_dependentes': 1}, headers=auth_headers(other)).status_code == 404
     assert other.get('/api/dashboard').json['custos']['configurado'] is False
 

@@ -371,7 +371,7 @@ As **credenciais de demonstração são entregues ao professor pelo Google Class
 
 Validação de 09/10/2026 (Windows 11, Python 3.12.10, Node 24):
 
-- **Backend:** 185 testes aprovados e 3 pulados (os opcionais de ICMP real).
+- **Backend:** 186 testes aprovados e 3 pulados (os opcionais de ICMP real).
 - **Frontend:** 20 de 20 aprovados (jsdom, API HTTP real temporária, build servido pelo Flask, proxy Vite e telas responsivas).
 
 As suítes cobrem também a documentação: `test_readme.py` (tabela de funcionalidades, rotas e links), `test_flowcharts.py`, `test_diagram.py`, `test_database_script.py` e `test_architecture.py`.
@@ -389,6 +389,7 @@ Limites conhecidos: o MVP mede de um ponto de rede por dispositivo, não descobr
 | [docs/PYTHONANYWHERE.md](docs/PYTHONANYWHERE.md) | Hospedagem gratuita usada na demonstração |
 | [docs/DEPLOY.md](docs/DEPLOY.md) | Produção, variáveis, backup e restauração |
 | [docs/LGPD.md](docs/LGPD.md) | Inventário de dados, bases legais, operadores (Google, PythonAnywhere) |
+| [docs/ROTEIRO_VIDEO.md](docs/ROTEIRO_VIDEO.md) | Roteiro cronometrado do vídeo de demonstração (até 5 min) |
 | [docs/DEMO.md](docs/DEMO.md) | Roteiro de demonstração |
 | [docs/LEGACY.md](docs/LEGACY.md) | Importação do banco do protótipo |
 | [collector/README.md](collector/README.md) | Coletor remoto e executável Windows |
