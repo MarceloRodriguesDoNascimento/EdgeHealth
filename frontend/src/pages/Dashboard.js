@@ -1,35 +1,60 @@
 import Chart from 'chart.js/auto';
-import { el,label,input,select,button,pageHeader,badge,table,date,number,empty,params,toast,brl } from '../ui/dom.js';
+import { el,label,input,select,button,pageHeader,badge,table,date,number,empty,params,toast,brl,port } from '../ui/dom.js';
 import { apiFetch } from '../services/api.js';
 import { collectorBadge } from './Coletores.js';
+
+const FONT='"Archivo Variable",ui-sans-serif,system-ui,sans-serif';
+const STATUS={ONLINE:'online',INSTAVEL:'instável',OFFLINE:'offline',SEM_COLETA:'aguardando a primeira medição'};
+
+// The headline of the panel: the state of the network in one plain sentence, worst news first.
+export function networkSummary(i){
+  if(!i.total)return 'Cadastre o primeiro dispositivo para começar a monitorar.';
+  const noun=n=>n===1?'dispositivo':'dispositivos',wait=n=>n===1?'aguarda':'aguardam';
+  const problems=[i.offline?`${i.offline} offline`:null,i.instaveis?`${i.instaveis} ${i.instaveis===1?'instável':'instáveis'}`:null].filter(Boolean);
+  if(problems.length){const first=i.offline||i.instaveis;return `${first} ${noun(first)} ${problems.join(' e ').replace(/^\d+ /,'')} agora.`;}
+  if(i.sem_coleta===i.total)return `${i.total} ${noun(i.total)} ${wait(i.total)} a primeira medição.`;
+  if(i.sem_coleta)return `Tudo online. ${i.sem_coleta} ${noun(i.sem_coleta)} ${wait(i.sem_coleta)} a primeira medição.`;
+  return i.total===1?'O dispositivo está online.':`Todos os ${i.total} dispositivos estão online.`;
+}
 
 export async function Dashboard(onDispose) {
   const initial=await apiFetch('/dashboard');
   const device=select('dispositivo_id',[['','Selecione um dispositivo'],...initial.dispositivos.map(d=>[d.id,d.nome])],initial.dispositivo_id||'');
   const start=input('inicio','',{type:'date'}),end=input('fim','',{type:'date'});
+  const ports=el('div',{className:'ports',role:'group','aria-label':'Dispositivos da rede'}),headline=el('h2',{'aria-live':'polite'});
   const cards=el('div',{className:'stats-grid'}),severity=el('div',{className:'severity-list'}),collectors=el('div',{className:'severity-list'}),recent=el('div'),costs=el('div',{className:'cost-summary'}),time=el('span',{className:'muted small'}),sampleInfo=el('p',{className:'muted small'});
   const latency=el('canvas',{'aria-label':'Histórico de latência',role:'img'}),loss=el('canvas',{'aria-label':'Histórico de perda de pacotes',role:'img'});
   let charts=[]; let stopped=false; let requestId=0;
   // Fewer x-axis labels on narrow charts (about one per 90 px); recalculated on resize and rotation.
   const ticks=canvas=>Math.max(3,Math.min(6,Math.floor((canvas.parentElement?.clientWidth||360)/90)));
   const onResize=()=>charts.forEach(c=>{const limit=ticks(c.canvas);if(c.options.scales.x.ticks.maxTicksLimit!==limit){c.options.scales.x.ticks.maxTicksLimit=limit;c.update('none');}});
-  const draw=(data)=>{
+  const drawContent=(data)=>{
+    // Refreshed every 15 s: announce the headline only when it changes and keep keyboard focus on the same port.
+    const summary=networkSummary(data.indicadores);if(headline.textContent!==summary)headline.textContent=summary;
+    const focused=ports.contains(document.activeElement)?document.activeElement.dataset.device:null;
+    ports.replaceChildren(...data.dispositivos.map(d=>{const state=d.status||'SEM_COLETA',text=`${d.nome}: ${STATUS[state]||state}`;
+      return port(state,{title:text,'aria-label':text,'aria-pressed':String(d.id===data.dispositivo_id),dataset:{device:String(d.id)},onclick:()=>{device.value=String(d.id);refresh();}},'button');}));
+    if(focused)ports.querySelector(`[data-device="${focused}"]`)?.focus();
     cards.replaceChildren(...[['Dispositivos',data.indicadores.total,'neutral'],['Online',data.indicadores.online,'good'],['Instáveis',data.indicadores.instaveis,'warn'],['Offline',data.indicadores.offline,'bad'],['Falhas abertas',data.indicadores.falhas_abertas,'blue']].map(([title,value,color])=>el('div',{className:`stat ${color}`},el('span',{},title),el('strong',{},value))));
     time.textContent=`Atualizado em ${date(data.atualizado_em)}`;
     sampleInfo.textContent=`${data.serie.length} de ${data.serie_total} amostras do dispositivo no período; no máximo as 500 mais recentes. ${data.indicadores.sem_coleta} sem coleta e ${data.indicadores.desatualizados} com dados ausentes ou desatualizados.`;
     collectors.replaceChildren(...(data.coletores.length?data.coletores.map(c=>el('div',{className:'severity-row'},el('span',{},c.nome),collectorBadge(c.estado))):[el('p',{className:'muted small'},'Nenhum coletor remoto. Os dispositivos são medidos pelo worker local.')]));
     costs.replaceChildren(...costSummary(data.custos));
     severity.replaceChildren(...['BAIXA','MEDIA','ALTA','CRITICA'].map(level=>el('div',{className:'severity-row'},badge(level),el('strong',{},data.severidades[level]||0))));
-    charts.forEach(c=>c.destroy());charts=[];
-    for(const [canvas,key,title,color,max] of [[latency,'latencia_ms','Latência (ms)','#087f8c',undefined],[loss,'perda_pacotes_pct','Perda (%)','#365cdb',100]]){
-      charts.push(new Chart(canvas,{type:'line',data:{labels:data.serie.map(m=>new Date(m.coletada_em).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})),datasets:[{label:title,data:data.serie.map(m=>m[key]),borderColor:color,backgroundColor:color+'12',fill:true,tension:0.2,pointRadius:data.serie.length<40?3:0,spanGaps:false}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false},tooltip:{callbacks:{title:items=>items.length?date(data.serie[items[0].dataIndex].coletada_em):''}}},scales:{x:{grid:{display:false},ticks:{maxTicksLimit:ticks(canvas),maxRotation:0,autoSkipPadding:12}},y:{beginAtZero:true,max,grid:{color:'#e9edf3'}}}}}));
-    }
     recent.replaceChildren(data.falhas_recentes.length?table(['Dispositivo','Ocorrência','Severidade','Início'],data.falhas_recentes.map(f=>[
       el('a',{href:`#falha/${f.id}`,className:'text-link'},f.dispositivo),badge(f.estado,f.estado==='ABERTA'?'INSTAVEL':'ONLINE'),badge(f.severidade),date(f.inicio)
     ])):empty('Nenhuma ocorrência registrada. Novas falhas aparecerão aqui.'));
   };
+  const drawCharts=(data)=>{
+    charts.forEach(c=>c.destroy());charts=[];
+    for(const [canvas,key,title,color,max] of [[latency,'latencia_ms','Latência (ms)','#1c3fab',undefined],[loss,'perda_pacotes_pct','Perda (%)','#b3201f',100]]){
+      charts.push(new Chart(canvas,{type:'line',data:{labels:data.serie.map(m=>new Date(m.coletada_em).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})),datasets:[{label:title,data:data.serie.map(m=>m[key]),borderColor:color,backgroundColor:color+'14',borderWidth:1.75,fill:true,tension:0.2,pointRadius:data.serie.length<40?2:0,spanGaps:false}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false},tooltip:{callbacks:{title:items=>items.length?date(data.serie[items[0].dataIndex].coletada_em):''}}},scales:{x:{grid:{display:false},border:{color:'#d6dae4'},ticks:{color:'#505a6e',font:{family:FONT,size:12},maxTicksLimit:ticks(canvas),maxRotation:0,autoSkipPadding:12}},y:{beginAtZero:true,max,grid:{color:'#e7e9f0'},border:{display:false},ticks:{color:'#505a6e',font:{family:FONT,size:12},maxTicksLimit:6}}}}}));
+    }
+  };
+  const draw=data=>{drawContent(data);drawCharts(data);};
   const refresh=async()=>{const own=++requestId;try{const data=await apiFetch(`/dashboard?${params({dispositivo_id:device.value,inicio:start.value,fim:end.value})}`);if(!stopped&&own===requestId)draw(data);}catch(e){if(!stopped&&own===requestId)toast(e.message,true);}};
-  const root=el('section',{},pageHeader('Visão da rede','Disponibilidade, desempenho e ocorrências.',el('div',{className:'actions'},time,button('Atualizar',refresh))),cards,
+  const root=el('section',{},pageHeader('Visão da rede','Disponibilidade, desempenho e ocorrências.',el('div',{className:'actions'},time,button('Atualizar',refresh))),
+    el('div',{className:'faceplate'},headline,ports,el('p',{},'Cada porta é um dispositivo. Escolha uma para ver o desempenho dela abaixo.')),cards,
     el('div',{className:'section-heading'},el('h2',{},'Desempenho no tempo'),el('span',{className:'muted small'},'Sem resposta: latência permanece desconhecida')),
     el('div',{className:'filters'},label('Dispositivo',device),label('Início (UTC)',start),label('Fim (UTC)',end),button('Aplicar',refresh,'primary')),
     sampleInfo,el('div',{className:'chart-grid'},el('div',{className:'panel'},el('h3',{},'Latência'),el('div',{className:'chart-box'},latency)),el('div',{className:'panel'},el('h3',{},'Perda de pacotes'),el('div',{className:'chart-box'},loss))),
@@ -37,7 +62,8 @@ export async function Dashboard(onDispose) {
       el('aside',{},el('div',{className:'panel'},el('h3',{},'Custo estimado das falhas (30 dias)'),costs),el('div',{className:'panel'},el('h3',{},'Severidade das falhas abertas'),severity),
         el('div',{className:'panel'},el('h3',{},'Coletores'),collectors,el('p',{className:'muted small'},'Coletor sem contato recente indica falta de dados, não queda dos dispositivos.')))));
   // The canvas must be attached before its responsive chart is initialized.
-  setTimeout(()=>{if(!stopped&&requestId===0)draw(initial);},0);
+  drawContent(initial);
+  setTimeout(()=>{if(!stopped&&requestId===0)drawCharts(initial);},0);
   const timer=setInterval(refresh,15000);
   window.addEventListener('resize',onResize);
   onDispose(()=>{stopped=true;clearInterval(timer);window.removeEventListener('resize',onResize);charts.forEach(c=>c.destroy());});
