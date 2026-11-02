@@ -20,6 +20,7 @@ try {
   for (const [name, who, path, action] of screens(data.failureId).filter(s => WANTED.includes(s[0]))) {
     const context = await ctx(who, 1280);
     const page = await context.newPage();
+    await page.emulateMedia({reducedMotion: 'reduce'});  // the sign-in trace fully drawn
     await page.goto(path); await settle(page);
     if (action) await action(page);
     await page.screenshot({path: `${out}${name}.png`, fullPage: !name.startsWith('modal')});

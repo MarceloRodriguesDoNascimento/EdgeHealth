@@ -27,13 +27,13 @@ IMG = ROOT / 'docs' / 'img'
 SITE = 'https://marcelodomingos.pythonanywhere.com'
 REPO = 'github.com/MarceloRodriguesDoNascimento/EdgeHealth'
 
-TEAL = RGBColor(0x08, 0x7F, 0x8C)
-TEAL_DARK = RGBColor(0x06, 0x5F, 0x69)
-MINT = RGBColor(0xBD, 0xF2, 0xEA)
-NAVY = RGBColor(0x12, 0x23, 0x3A)
-INK = RGBColor(0x1F, 0x2A, 0x37)
-MUTED = RGBColor(0x5B, 0x6B, 0x7B)
-LIGHT = RGBColor(0xF1, 0xF6, 0xF7)
+CABLE = RGBColor(0x1C, 0x3F, 0xAB)
+CABLE_DEEP = RGBColor(0x14, 0x2F, 0x85)
+MINT = RGBColor(0xDF, 0xE6, 0xFB)
+NAVY = RGBColor(0x0A, 0x1A, 0x52)
+INK = RGBColor(0x13, 0x1A, 0x2B)
+MUTED = RGBColor(0x50, 0x5A, 0x6E)
+LIGHT = RGBColor(0xEC, 0xEE, 0xF3)
 WHITE = RGBColor(0xFF, 0xFF, 0xFF)
 RED = RGBColor(0xC6, 0x28, 0x28)
 FONT = 'Segoe UI'
@@ -143,7 +143,7 @@ def bullets(slide, x, y, w, h, items, size=22, color=INK, gap=10):
     return box
 
 
-def box(slide, x, y, w, h, title=None, body=None, color=LIGHT, title_color=TEAL_DARK, body_size=20, title_size=22,
+def box(slide, x, y, w, h, title=None, body=None, color=LIGHT, title_color=CABLE_DEEP, body_size=20, title_size=22,
         shape=MSO_SHAPE.ROUNDED_RECTANGLE, border=None, body_color=INK, align=PP_ALIGN.LEFT, anchor=MSO_ANCHOR.TOP,
         margin=0.18):
     s = slide.shapes.add_shape(shape, x, y, w, h)
@@ -174,7 +174,7 @@ def box(slide, x, y, w, h, title=None, body=None, color=LIGHT, title_color=TEAL_
     return s
 
 
-def arrow(slide, x1, y1, x2, y2, color=TEAL, width=2.5, label=None, label_size=16):
+def arrow(slide, x1, y1, x2, y2, color=CABLE, width=2.5, label=None, label_size=16):
     c = slide.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, x1, y1, x2, y2)
     c.line.color.rgb = color
     c.line.width = Pt(width)
@@ -206,10 +206,10 @@ def base(prs, title, kicker=None, number=None):
     bg.solid()
     bg.fore_color.rgb = WHITE
     bar = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0.5), Inches(0.42), Inches(0.12), Inches(0.62))
-    fill(bar, TEAL)
+    fill(bar, CABLE)
     no_line(bar)
     if kicker:
-        text(slide, Inches(0.75), Inches(0.22), Inches(11), Inches(0.35), kicker.upper(), size=14, color=TEAL, bold=True)
+        text(slide, Inches(0.75), Inches(0.22), Inches(11), Inches(0.35), kicker.upper(), size=14, color=CABLE, bold=True)
     text(slide, Inches(0.75), Inches(0.45), Inches(12), Inches(0.75), title, size=34, color=NAVY, bold=True)
     footer = f'EdgeHealth · Projeto de Software · PS-3B1/2026' + (f'   {number}' if number else '')
     text(slide, Inches(0.5), Inches(7.05), Inches(12.33), Inches(0.3), footer, size=11, color=MUTED, align=PP_ALIGN.RIGHT)
@@ -232,7 +232,7 @@ def cover(prs, img):
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     bg = slide.background.fill
     bg.solid()
-    bg.fore_color.rgb = TEAL
+    bg.fore_color.rgb = CABLE
     panel = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(7.55), 0, Inches(5.783), H)
     fill(panel, NAVY)
     no_line(panel)
@@ -263,7 +263,7 @@ def problem(prs):
     y = Inches(1.55)
     for sentence, n in items:
         circle = slide.shapes.add_shape(MSO_SHAPE.OVAL, Inches(0.75), y, Inches(0.75), Inches(0.75))
-        fill(circle, TEAL)
+        fill(circle, CABLE)
         no_line(circle)
         circle.text_frame.text = n
         p = circle.text_frame.paragraphs[0]
@@ -285,14 +285,14 @@ def solution(prs):
     slide = base(prs, 'Solução: medir, diagnosticar, estimar e explicar', 'Como funciona', 3)
     text(slide, Inches(0.75), Inches(1.35), Inches(12), Inches(0.9),
          'O EdgeHealth monitora a rede da empresa, aponta a causa provável de cada falha e mostra quanto ela custou.',
-         size=24, color=TEAL_DARK, bold=True)
+         size=24, color=CABLE_DEEP, bold=True)
     steps = [('Coletor', 'mede os equipamentos da rede (ICMP)'), ('Servidor', 'detecta a falha e calcula a severidade'),
              ('Diagnóstico', 'causa provável e recomendações'), ('Prejuízo', 'horas paradas × pessoas × custo'),
              ('IA', 'explica em português simples')]
     x, w, gap = Inches(0.6), Inches(2.25), Inches(0.27)
     for i, (title, body) in enumerate(steps):
-        box(slide, x, Inches(2.75), w, Inches(2.6), title, body, color=TEAL if i in (0, 4) else LIGHT,
-            title_color=WHITE if i in (0, 4) else TEAL_DARK, body_color=WHITE if i in (0, 4) else INK,
+        box(slide, x, Inches(2.75), w, Inches(2.6), title, body, color=CABLE if i in (0, 4) else LIGHT,
+            title_color=WHITE if i in (0, 4) else CABLE_DEEP, body_color=WHITE if i in (0, 4) else INK,
             body_size=20, title_size=24, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE, margin=0.06)
         if i < len(steps) - 1:
             arrow(slide, x + w + Inches(0.02), Inches(4.05), x + w + gap - Inches(0.02), Inches(4.05))
@@ -321,7 +321,7 @@ def use_case(prs, number, slide_no, title, kind, what, image, flow, chain, speak
     step = Inches(1.25)
     for i, (layer, name) in enumerate(chain):
         b = box(slide, x, y, w, Inches(1.05), layer.upper(), split_name(name), color=LIGHT if layer != 'Tela' else MINT,
-                title_size=12, body_size=15, title_color=TEAL)
+                title_size=12, body_size=15, title_color=CABLE)
         b.text_frame.margin_top = b.text_frame.margin_bottom = Inches(0.04)
         if i < len(chain) - 1:
             arrow(slide, x + w // 2, y + Inches(1.05), x + w // 2, y + step, width=2)
@@ -336,10 +336,10 @@ def architecture(prs):
     slide = base(prs, 'Arquitetura cliente-servidor', 'Arquitetura', 9)
     box(slide, Inches(0.6), Inches(1.6), Inches(3.1), Inches(1.9), 'Cliente (frontend)',
         ['Navegador', 'Vite + JavaScript', 'Chart.js'], color=MINT, body_size=20)
-    api = box(slide, Inches(5.0), Inches(1.35), Inches(4.1), Inches(4.6), 'Servidor: API Flask', None, color=LIGHT, border=TEAL)
+    api = box(slide, Inches(5.0), Inches(1.35), Inches(4.1), Inches(4.6), 'Servidor: API Flask', None, color=LIGHT, border=CABLE)
     for i, (layer, color) in enumerate([('Controllers', WHITE), ('Services', WHITE), ('Models + Repositories', WHITE)]):
         box(slide, Inches(5.3), Inches(2.05) + i * Inches(1.25), Inches(3.5), Inches(0.85), None, layer, color=color,
-            border=TEAL, body_size=20, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
+            border=CABLE, body_size=20, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
         if i < 2:
             arrow(slide, Inches(7.05), Inches(2.9) + i * Inches(1.25), Inches(7.05), Inches(3.3) + i * Inches(1.25), width=2)
     box(slide, Inches(10.55), Inches(3.95), Inches(2.3), Inches(1.6), None, ['SQLite', '13 tabelas'], color=NAVY,
@@ -347,7 +347,7 @@ def architecture(prs):
     box(slide, Inches(10.4), Inches(1.6), Inches(2.6), Inches(1.3), 'Google Gemini', 'IA como serviço', color=LIGHT,
         body_size=18, title_size=20, align=PP_ALIGN.CENTER)
     box(slide, Inches(0.6), Inches(4.3), Inches(3.1), Inches(1.65), 'Coletor', ['Na rede da empresa', 'mede por ICMP'],
-        color=TEAL, title_color=WHITE, body_color=WHITE, body_size=20)
+        color=CABLE, title_color=WHITE, body_color=WHITE, body_size=20)
     arrow(slide, Inches(3.75), Inches(2.55), Inches(4.95), Inches(2.55), label='HTTP / JSON')
     arrow(slide, Inches(3.75), Inches(5.1), Inches(4.95), Inches(5.1), label='HTTPS')
     arrow(slide, Inches(9.15), Inches(4.75), Inches(10.5), Inches(4.75))
@@ -366,12 +366,12 @@ def architecture(prs):
 def directories(prs):
     slide = base(prs, 'API em camadas: os diretórios', 'Organização do código', 11)
     rows = [('backend/', '', NAVY),
-            ('├── controllers/', '12 classes, uma por recurso + rotas.py (39 rotas)', TEAL_DARK),
-            ('├── services/', '68 classes, um caso de uso cada (executar)', TEAL_DARK),
-            ('├── models/', '13 entidades; BaseModel com o CRUD', TEAL_DARK),
-            ('├── repositories/', '13 classes, só consultas SQL especiais', TEAL_DARK),
-            ('├── database/', 'create_database.sql', TEAL_DARK),
-            ('└── app/', 'configuração, segurança e validação', TEAL_DARK),
+            ('├── controllers/', '12 classes, uma por recurso + rotas.py (39 rotas)', CABLE_DEEP),
+            ('├── services/', '68 classes, um caso de uso cada (executar)', CABLE_DEEP),
+            ('├── models/', '13 entidades; BaseModel com o CRUD', CABLE_DEEP),
+            ('├── repositories/', '13 classes, só consultas SQL especiais', CABLE_DEEP),
+            ('├── database/', 'create_database.sql', CABLE_DEEP),
+            ('└── app/', 'configuração, segurança e validação', CABLE_DEEP),
             ('frontend/src/pages/', '9 telas; services/api.js faz o fetch', NAVY),
             ('collector/', 'coletor remoto (Python e .exe)', NAVY)]
     panel = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.6), Inches(1.4), Inches(12.1), Inches(4.6))
@@ -427,7 +427,7 @@ def database(prs):
             cell = table.cell(r, c)
             cell.text = '\n'.join(split_name(value)) if r and c == 0 else value
             cell.fill.solid()
-            cell.fill.fore_color.rgb = TEAL if r == 0 else (LIGHT if r % 2 else WHITE)
+            cell.fill.fore_color.rgb = CABLE if r == 0 else (LIGHT if r % 2 else WHITE)
             for p in cell.text_frame.paragraphs:
                 for run in p.runs:
                     run.font.size = Pt(16 if r else 18)
@@ -462,14 +462,14 @@ def technologies(prs):
 def readme(prs):
     slide = base(prs, 'README e funcionalidades implementadas', 'Documentação', 14)
     box(slide, Inches(0.6), Inches(1.5), Inches(4.0), Inches(2.4), None, ['27', 'funcionalidades implementadas'],
-        color=TEAL, body_color=WHITE, body_size=24, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
+        color=CABLE, body_color=WHITE, body_size=24, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
     slide.shapes[-1].text_frame.paragraphs[0].runs[0].font.size = Pt(66)
     slide.shapes[-1].text_frame.paragraphs[0].runs[0].font.bold = True
     box(slide, Inches(0.6), Inches(4.15), Inches(4.0), Inches(2.4), None, ['6', 'principais, além de CRUD (★)'],
         color=NAVY, body_color=WHITE, body_size=24, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
     slide.shapes[-1].text_frame.paragraphs[0].runs[0].font.size = Pt(66)
     slide.shapes[-1].text_frame.paragraphs[0].runs[0].font.bold = True
-    text(slide, Inches(5.0), Inches(1.45), Inches(7.8), Inches(0.5), 'As 6 funcionalidades principais (★):', size=22, color=TEAL_DARK, bold=True)
+    text(slide, Inches(5.0), Inches(1.45), Inches(7.8), Inches(0.5), 'As 6 funcionalidades principais (★):', size=22, color=CABLE_DEEP, bold=True)
     bullets(slide, Inches(5.0), Inches(2.0), Inches(7.8), Inches(3.4), [
         'Detecção de falhas pelo coletor', 'Diagnóstico com recomendações', 'Prejuízo estimado de cada falha',
         'Explicação com IA', 'Dashboard com ranking de custo', 'Relatório ZIP'], size=22, gap=4)
@@ -491,14 +491,14 @@ def bonus_quality(prs):
         box(slide, Inches(0.6) + i * Inches(4.1), Inches(1.45), Inches(3.85), Inches(2.85), title, body,
             color=MINT, body_size=20, title_size=24)
     box(slide, Inches(0.6), Inches(4.55), Inches(12.05), Inches(2.25), 'Qualidade e segurança', [
-        '187 testes no backend e 20 no frontend, todos passando.',
+        '187 testes no backend e 23 no frontend, todos passando.',
         'Senhas com hash, sessão protegida contra CSRF, cada empresa só vê os próprios dados.'],
         color=LIGHT, body_size=22, title_size=24)
     notes(slide, JL, 50, [
         'Fizemos os três bônus. A IA como serviço: o Gemini explica a ocorrência, e a gente manda só dados técnicos, nunca nome, e-mail, CNPJ ou IP.',
         'O sistema está hospedado no PythonAnywhere, com HTTPS.',
         'E tem os termos: ninguém usa o sistema sem aceitar, e a versão aceita fica registrada, junto com o aviso de privacidade da LGPD.',
-        'Sobre qualidade: são 187 testes automatizados no backend e 20 no frontend, todos passando.',
+        'Sobre qualidade: são 187 testes automatizados no backend e 23 no frontend, todos passando.',
         'As senhas são guardadas com hash, a sessão é protegida contra CSRF e uma empresa nunca vê os dados de outra.'])
 
 

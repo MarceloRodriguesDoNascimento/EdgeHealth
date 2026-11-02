@@ -238,8 +238,9 @@ def test_report_has_the_estimate_column_and_the_total(app, configured, device):
 
 def test_dashboard_shows_the_30_day_total_and_top_devices(app, configured, device):
     now = utcnow()
-    start = now - timedelta(days=2)
-    make_failure(app, device['id'], start, start + timedelta(days=1), users=25, loss=100)
+    # The most recent past Wednesday at noon: inside working hours whatever day the suite runs.
+    start = (now - timedelta(days=(now.weekday() - 2) % 7 or 7)).replace(hour=15, minute=0, second=0, microsecond=0)
+    make_failure(app, device['id'], start, start + timedelta(hours=2), users=25, loss=100)
     c = configured.get('/api/dashboard').json['custos']
     assert c['configurado'] and c['dias'] == 30 and Decimal(c['total']) > 0
     assert c['top_dispositivos'][0]['nome'] == device['nome']

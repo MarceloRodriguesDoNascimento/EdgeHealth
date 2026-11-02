@@ -5,6 +5,7 @@ endpoint or production configuration. It exercises the actual collection and
 persistence pipeline with deterministic inputs; it does not validate ICMP.
 """
 import json
+import os
 import sys
 import tempfile
 import threading
@@ -27,7 +28,7 @@ def main():
             upgrade(directory=str(Path(__file__).resolve().parents[1] / 'migrations'))
             PopularCatalogoService().executar()
             db.session.commit()
-        server = make_server('127.0.0.1', 0, app, threaded=True)
+        server = make_server('127.0.0.1', int(os.environ.get('UI_SERVER_PORT', 0)), app, threaded=True)
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         print(json.dumps({'ready': f'http://127.0.0.1:{server.server_port}'}), flush=True)

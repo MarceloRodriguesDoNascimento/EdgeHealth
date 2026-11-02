@@ -29,7 +29,7 @@ export async function Empresa(session) {
   const admin=session.usuario.papel==='ADMIN';
   const data=admin?el('div',{className:'panel narrow'},form([
     label('Nome da empresa',input('nome_fantasia','',{required:true,value:company.nome_fantasia,maxLength:150})),
-    label('CNPJ',input('cnpj','',{required:true,value:company.cnpj,maxLength:18,autoComplete:'off',autocapitalize:'characters',autocorrect:'off'})),
+    label('CNPJ',input('cnpj','',{required:true,value:company.cnpj,maxLength:18,autoComplete:'off',autocapitalize:'characters',autocorrect:'off',spellcheck:false})),
     label('E-mail de contato',input('email','',{type:'email',value:company.email||'',autoComplete:'email'})),
     label('Telefone',input('telefone','',{type:'tel',value:company.telefone||'',maxLength:30,autoComplete:'tel'}))
   ],'Salvar empresa',async data=>{ const updated=await apiFetch('/empresa',{method:'PUT',body:json(data)}); session.empresa=updated; toast('Dados da empresa atualizados.'); document.querySelector('#company-name').textContent=updated.nome_fantasia; }))
@@ -50,7 +50,7 @@ function costsPanel(company,session,admin){
   const people=input('total_funcionarios','Ex.: 40',{type:'number',inputMode:'numeric',min:0,step:1,value:c.total_funcionarios??''});
   const factor=input('fator_encargos','1,7',{value:fmt(c.fator_encargos,1),inputMode:'decimal',autoComplete:'off'});
   const hours=input('horas_mes','220',{type:'number',inputMode:'numeric',min:1,max:744,value:c.horas_mes});
-  const zone=input('fuso','America/Sao_Paulo',{value:c.fuso,autoComplete:'off',autocapitalize:'none'});
+  const zone=input('fuso','America/Sao_Paulo',{value:c.fuso,autoComplete:'off',autocapitalize:'none',spellcheck:false});
   const start=input('inicio','',{type:'time',value:c.expediente.inicio,required:true}),end=input('fim','',{type:'time',value:c.expediente.fim,required:true});
   const days=el('fieldset',{className:'day-picker full'},el('legend',{},'Dias de expediente'),
     DAYS.map(([d,name])=>el('label',{className:'checkbox'},el('input',{type:'checkbox',name:'dias',value:String(d),checked:c.expediente.dias.includes(d)}),name)));

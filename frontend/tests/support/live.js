@@ -56,7 +56,7 @@ export async function launch() {
   return chromium.launch({executablePath, headless: true});
 }
 
-async function api(context, method, path, data) {
+export async function api(context, method, path, data) {
   const csrf = (await context.cookies()).find(c => c.name === 'edgehealth_csrf')?.value || '';
   const response = await context.request.fetch(path, {method, data, headers: {'X-CSRF-Token': csrf}});
   if (!response.ok()) throw new Error(`${method} ${path}: HTTP ${response.status()} ${await response.text()}`);

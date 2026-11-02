@@ -17,7 +17,13 @@ export const empty = (text = 'Nenhum registro encontrado.') => el('div', { class
 export const label = (text, input) => el('label', { className: 'field' }, el('span', {}, text), input);
 export const input = (name, placeholder = '', props = {}) => el('input', { name, placeholder, ...props });
 export const button = (text, action, kind = 'secondary', props = {}) => el('button', { type: 'button', className: `button ${kind}`, onclick: action, ...props }, text);
-export const badge = (text, kind) => el('span', { className: `badge ${kind || text || 'SEM_COLETA'}` }, text || 'Aguardando coleta');
+// API codes stay as they are in the JSON; only what the person reads is translated.
+const NAMES = { ONLINE: 'Online', INSTAVEL: 'Instável', OFFLINE: 'Offline', BAIXA: 'Baixa', MEDIA: 'Média', ALTA: 'Alta', CRITICA: 'Crítica',
+  ABERTA: 'Aberta', ENCERRADA: 'Encerrada', INDISPONIBILIDADE: 'Indisponibilidade', INSTABILIDADE: 'Instabilidade',
+  LOCALIZADA: 'Problema localizado', COMPARTILHADA: 'Infraestrutura compartilhada', CONGESTIONAMENTO: 'Congestionamento',
+  LATENCIA: 'Latência alta', RECORRENTE: 'Falha recorrente', RECUPERACAO: 'O dispositivo voltou a responder', ARQUIVAMENTO: 'O dispositivo foi arquivado' };
+export const human = code => NAMES[code] || code;
+export const badge = (text, kind) => el('span', { className: `badge ${kind || text || 'SEM_COLETA'}` }, text ? human(text) : 'Aguardando coleta');
 export function date(value) { return value ? new Date(value).toLocaleString('pt-BR') : '—'; }
 export function duration(seconds) { const m = Math.floor(seconds / 60); return m >= 60 ? `${Math.floor(m/60)}h ${m%60}min` : `${m}min ${Math.floor(seconds%60)}s`; }
 // Money arrives from the API as exact decimal text ("1234.56"); display only, never recomputed here.
@@ -86,5 +92,25 @@ export function pageHeader(title, description, actions) {
   return el('header', { className: 'page-heading' }, el('div', {}, el('h1', {}, title), description ? el('p', { className: 'muted' }, description) : null), actions);
 }
 export function params(data) { return new URLSearchParams(Object.entries(data).filter(([,v]) => v !== '' && v !== null && v !== undefined)).toString(); }
+// Line icons drawn on a 24 px grid; static strings only, never user data.
+const ICONS = {
+  pulse: 'M3 12h4l3-7 4 14 3-7h4',
+  server: 'M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01',
+  clock: 'M12 3a9 9 0 1 0 0 18a9 9 0 0 0 0-18zM12 7v5l3 2',
+  download: 'M12 4v11M7.5 10.5 12 15l4.5-4.5M4 20h16',
+  building: 'M5 21V4h10v17M15 10h4v11M3 21h18M9 8h2M9 12h2M9 16h2',
+  antenna: 'M12 11v10M8 21h8M8.5 14.5a5 5 0 0 1 0-7M15.5 7.5a5 5 0 0 1 0 7M5.5 17.5a9 9 0 0 1 0-13M18.5 4.5a9 9 0 0 1 0 13',
+  users: 'M9 11a4 4 0 1 0 0-8a4 4 0 0 0 0 8zM2 21v-1a6 6 0 0 1 6-6h2a6 6 0 0 1 6 6v1M16 3.5a4 4 0 0 1 0 7M18 14.3a6 6 0 0 1 4 5.7v1',
+  menu: 'M4 7h16M4 12h16M4 17h16',
+};
+export function icon(name) {
+  const node = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  for (const [key, value] of Object.entries({ viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.7', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', class: 'icon', 'aria-hidden': 'true' })) node.setAttribute(key, value);
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', ICONS[name]); node.append(path);
+  return node;
+}
+// One switch port. As a button it selects a device; as a span it is decorative (sign-in screen).
+export const port = (status, props = {}, tag = 'span') => el(tag, { className: `port ${status || 'SEM_COLETA'}`, ...(tag === 'button' ? { type: 'button' } : {}), ...props });
 // Brand logo (public/logo.svg). The image carries the accessible name; adjacent text is aria-hidden.
 export const brandLogo = () => el('img', { src: '/logo.svg', alt: 'EdgeHealth', className: 'brand-logo', width: 36, height: 36 });
