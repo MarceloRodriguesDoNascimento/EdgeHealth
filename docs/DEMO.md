@@ -21,7 +21,7 @@ Roteiro reproduzível. Use somente equipamentos e redes que a equipe administra 
 8. **Indisponibilidade controlada:** desligue ou desconecte **somente** o alvo controlado. As primeiras ausências geram INSTÁVEL; três ciclos sem resposta confirmam OFFLINE. A latência fica "—" (desconhecida) e a perda vai a 100%.
 9. **Abertura da falha:** em **Histórico de falhas**, aparece uma ocorrência com data, horário, dispositivo e severidade.
 10. **Sem duplicação:** aguarde mais 2–3 ciclos. Continua **uma** ocorrência, com o mesmo ID; a duração e a "última observação" avançam.
-11. **Detalhe:** abra a ocorrência. Mostre a severidade e sua justificativa, o diagnóstico `LOCALIZADA` (o outro dispositivo respondeu), as causas apresentadas como hipóteses, as recomendações e as evidências. Explique que ICMP bloqueado também produziria esse quadro.
+11. **Detalhe:** abra a ocorrência. Mostre a severidade e sua justificativa, o diagnóstico "Problema localizado" (o outro dispositivo respondeu), as causas apresentadas como hipóteses, as recomendações e as evidências. Explique que ICMP bloqueado também produziria esse quadro.
 12. **Impacto:** informe uma estimativa de usuários afetados (ex.: 12) com observação. A origem fica "informada pela equipe" e a severidade é recalculada. Ressalte que a duração é calculada e o número de usuários é estimativa manual.
 13. **Restauração:** religue o alvo.
 14. **Encerramento:** após duas coletas saudáveis, o dispositivo volta a ONLINE e a ocorrência fica ENCERRADA com motivo RECUPERAÇÃO, preservando o diagnóstico. Uma nova queda criaria outro ID.

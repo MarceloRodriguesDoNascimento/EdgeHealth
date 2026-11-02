@@ -41,7 +41,7 @@ Versões conferidas em `backend/requirements.txt`, `frontend/package.json` e `co
 
 | Parte | Tecnologias |
 | --- | --- |
-| **Frontend** | JavaScript (módulos ES, sem framework), Vite 8.2.2, Chart.js 4.5.1, HTML/CSS responsivo. Testes: jsdom 26.1.0 e playwright-core 1.63. Node.js 22.12 ou superior. |
+| **Frontend** | JavaScript (módulos ES, sem framework), Vite 8.2.2, Chart.js 4.5.1, fonte Archivo (@fontsource-variable/archivo 5.2.8, servida pelo próprio site), HTML/CSS responsivo. Testes: jsdom 26.1.0 e playwright-core 1.63. Node.js 22.12 ou superior. |
 | **Backend** | Python 3.12, Flask 3.1.3, Flask-SQLAlchemy 3.1.1 / SQLAlchemy 2.0.52, python-dotenv 1.2.3, icmplib 3.0.4 (ICMP), tzdata 2026.5, waitress 3.0.2 (servidor WSGI local). Testes: pytest. |
 | **Banco de dados** | SQLite, esquema versionado com Flask-Migrate 4.1.0 / Alembic; script DDL em [`backend/database/create_database.sql`](backend/database/create_database.sql). |
 | **IA** | Google Gemini (API REST `generateContent`), modelo padrão `gemini-3.5-flash-lite`, chamada pela biblioteca padrão (`urllib`), sem SDK. |
@@ -370,10 +370,10 @@ As **credenciais de demonstração são entregues ao professor pelo Google Class
 
 ## Testes e status
 
-Validação de 09/10/2026 (Windows 11, Python 3.12.10, Node 24):
+Validação de 02/11/2026 (Windows 11, Python 3.12.10, Node 24):
 
 - **Backend:** 187 testes aprovados e 3 pulados (os opcionais de ICMP real).
-- **Frontend:** 20 de 20 aprovados (jsdom, API HTTP real temporária, build servido pelo Flask, proxy Vite e telas responsivas).
+- **Frontend:** 23 de 23 aprovados (jsdom, API HTTP real temporária, build servido pelo Flask, proxy Vite e telas responsivas).
 
 As suítes cobrem também a documentação: `test_readme.py` (tabela de funcionalidades, rotas e links), `test_flowcharts.py`, `test_diagram.py`, `test_database_script.py` e `test_architecture.py`.
 

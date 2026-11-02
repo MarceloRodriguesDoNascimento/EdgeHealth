@@ -161,7 +161,7 @@ test('interface completa usa a API HTTP e SQLite migrado, sem respostas HTTP sim
     const failures=await apiFetch('/falhas');assert.equal(failures.total,1);failureId=failures.items[0].id;
     mount(await Historico());assert.match(document.querySelector('#app').textContent,/Servidor atualizado/);
     mount(await Falha(failureId));
-    assert.match(document.querySelector('#app').textContent,/CONGESTIONAMENTO/);
+    assert.match(document.querySelector('#app').textContent,/Congestionamento/);
     assert.match(document.querySelector('#app').textContent,/Verificar tráfego e interfaces/);
     await submit({usuarios_afetados:'60',custos_diretos:'250,00',observacao:'Informação do responsável de TI'});
     assert.equal((await apiFetch(`/falhas/${failureId}`)).severidade,'CRITICA');
@@ -178,6 +178,8 @@ test('interface completa usa a API HTTP e SQLite migrado, sem respostas HTTP sim
     await until(()=>document.querySelectorAll('.stat strong').length===5,'Dashboard não desenhou');
     assert.deepEqual([...document.querySelectorAll('.stat strong')].map(n=>n.textContent),['1','0','1','0','1']);
     const canvas=document.querySelectorAll('canvas');assert.equal(canvas.length,2);
+    // Numbers are in place before the page is attached (no layout shift); charts need an attached canvas and come next.
+    await until(()=>Chart.getChart(canvas[0])&&Chart.getChart(canvas[1]),'Gráficos não desenhados');
     assert.match(document.querySelector('.cost-summary').textContent,/R\$\s[\d.]+,\d{2}/);
     assert.match(document.querySelector('.cost-summary').textContent,/Servidor atualizado/);
     assert.deepEqual(Chart.getChart(canvas[0]).data.datasets[0].data,[2.5,220,240]);
@@ -195,7 +197,7 @@ test('interface completa usa a API HTTP e SQLite migrado, sem respostas HTTP sim
     assert.ok(incident.diagnostico.recomendacoes.length);
     mount(await Historico());
     document.querySelector('[name=estado]').value='ENCERRADA';button('Filtrar').click();
-    await until(()=>document.querySelector('tbody').textContent.includes('ENCERRADA'),'Histórico não filtrou');
+    await until(()=>document.querySelector('tbody').textContent.includes('Encerrada'),'Histórico não filtrou');
     mount(await Dispositivos(session));button('Métricas').click();
     await until(()=>document.querySelector('dialog tbody tr'),'Métricas não carregaram');
     assert.match(document.querySelector('dialog').textContent,/9 amostras/);
