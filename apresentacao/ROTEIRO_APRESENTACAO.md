@@ -35,9 +35,9 @@ Uma pessoa opera o notebook (sugestão: **Marcelo Domingos**, que cuida do labor
 | Tempo | Na tela | Quem narra | O que dizer |
 | --- | --- | --- | --- |
 | 0:00–0:20 | Terminal: `python tests\lab\edgelab.py falha offline desktop`. Volta ao site. | Marcelo Domingos | "Acabamos de desligar o Desktop do financeiro no nosso laboratório. Vamos ver o sistema detectar sozinho." |
-| 0:20–1:00 | **Visão da rede** [26]: cards, gráficos, ranking de custo, coletor "Ativo". | Felipe | "Essa é a visão da rede ao vivo, com o ranking dos aparelhos que mais custaram." |
+| 0:20–1:00 | **Visão da rede** [26]: frase de resumo, painel de portas (clique numa porta), gráficos, ranking de custo, coletor "Ativo". | Felipe | "Cada porta é um equipamento, e a frase já diz como a rede está. Aqui, o ranking dos que mais custaram." |
 | 1:00–1:20 | **Histórico de falhas** [21]: estado "Abertas" → **Filtrar**. Abre a Impressora. | Erick | "A impressora caiu antes da apresentação; o coletor detectou e o servidor abriu a ocorrência [20]." |
-| 1:20–2:00 | Ocorrência: **Severidade**, **Diagnóstico** (LOCALIZADA) e **Recomendações** [22]. | Erick | "Só ela parou e os outros respondem: problema localizado, e as recomendações do que verificar." |
+| 1:20–2:00 | Ocorrência: frase e números no topo, **Diagnóstico** ("Problema localizado") e **Recomendações** [22]. | Erick | "Só ela parou e os outros respondem: problema localizado, e as recomendações do que verificar." |
 | 2:00–2:40 | **Prejuízo estimado** [24] → **Impacto operacional**: 12 usuários → **Salvar impacto** [23]. | Felipe | "Com doze pessoas afetadas, o prejuízo é recalculado e a severidade sobe para alta." |
 | 2:40–3:30 | **Explicar com IA** [25]. | João Lucas | "O Gemini recebe só dados técnicos e explica em linguagem simples. A IA explica; quem diagnostica é o sistema." |
 | 3:30–4:00 | Histórico → **Filtrar**: aparece o Desktop [20]. | Marcelo Rodrigues | "E o Desktop que desligamos no começo já virou uma ocorrência, sem ninguém cadastrar nada." |
@@ -49,7 +49,7 @@ Uma pessoa opera o notebook (sugestão: **Marcelo Domingos**, que cuida do labor
 ### Se a falha demorar
 
 - O Desktop não apareceu em 3:30: clique em **Filtrar** de novo; se ainda não, diga "a coleta é a cada minuto" e abra uma ocorrência já registrada (filtro "Encerradas") ou o "Host inexistente (TEST-NET)", que está OFFLINE de propósito.
-- A Impressora não está OFFLINE: use o TEST-NET (diagnóstico, severidade CRITICA e prejuízo).
+- A Impressora não está OFFLINE: use o TEST-NET (diagnóstico, severidade Crítica e prejuízo).
 - **Explicar com IA** deu erro: mostre a mensagem clara do sistema ("serviço sobrecarregado/cota") e siga; o vídeo gravado tem esse trecho funcionando.
 
 ## Plano B se a internet falhar
