@@ -81,9 +81,13 @@ Nenhum afeta a nota estimada, mas um professor exigente pode apontar:
 1. ~~**Fórmula do custo/hora repetida no frontend**~~ — ✅ **corrigido**. A prévia em `frontend/src/pages/Empresa.js` agora pergunta ao servidor (`POST /api/empresa/custos/previa` → `EmpresaController.simular_custos` → `SimularCustoHoraService`), que usa a mesma `CalculadoraPrejuizo.custo_hora_de` do restante do sistema e os padrões do Model (`Empresa.FATOR_ENCARGOS_PADRAO`, `Empresa.HORAS_MES_PADRAO`). Nada é salvo. Testes em `tests/test_costs.py` (fórmula, padrões, validação, técnico recebe 403) e no teste de integração do frontend.
 2. **Padrões repetidos no frontend** (`Empresa.js`): com o campo vazio, envia fator `1.7` e `220` h, os mesmos padrões do Model `Empresa`. Mudar para "não enviar" alteraria o comportamento (manteria o valor anterior em vez de voltar ao padrão); **não foi feito**.
 3. ~~**Controller chamando dois Services**~~ — ✅ **corrigido**. `FalhaController.registrar_impacto` e `explicar_com_ia` agora chamam um único Service, que recebe o id e o corpo JSON, busca a ocorrência primeiro (`ObterFalhaService.buscar`) e só depois valida o payload, mantendo o 404 de outra empresa antes do 400. Regra nova em `tests/test_architecture.py` (`test_each_controller_method_calls_a_single_service`) e regressão da ordem em `tests/test_costs.py`; fluxogramas 3 e 6 atualizados.
-4. **Capturas de página inteira**: o menu lateral não acompanha a altura total da página na captura (só na captura; na tela real ele é fixo).
+4. ~~**Capturas de página inteira**~~ — ✅ **corrigido**. O novo visual troca o menu lateral por abas no topo.
 
 Código morto: nenhum resto de `app/api.py`, `app/models.py` ou `app/services/` (nem `__pycache__` órfão); nenhuma classe ou método de Repository sem uso.
+
+## Novo visual (02/11/2026)
+
+Só o frontend mudou de aparência: rotas, JSON e regras de negócio são os mesmos. Revisado com Lighthouse (acessibilidade 100 no login, no dashboard e na ocorrência) e no Chrome em 1366 e 390 px; CLS do dashboard no celular de 0,368 para 0,084. Teclado: o foco permanece na porta após cada atualização de 15 s. Status não depende só da cor: o LED também muda de forma. `tests/test_costs.py`: o teste do total de 30 dias falhava às segundas (a falha caía no fim de semana) e agora usa uma quarta-feira recente.
 
 ## Corrigido nesta auditoria
 
