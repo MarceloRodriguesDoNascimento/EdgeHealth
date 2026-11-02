@@ -1,6 +1,7 @@
+import '@fontsource-variable/archivo/wdth.css';
 import './styles.css';
 import { apiFetch } from './services/api.js';
-import { el,button,toast,confirmAction,brandLogo } from './ui/dom.js';
+import { el,button,toast,confirmAction,brandLogo,icon } from './ui/dom.js';
 import { Login, TermsPending } from './pages/Login.js';
 import { Coletores } from './pages/Coletores.js';
 import { Dashboard } from './pages/Dashboard.js';
@@ -27,14 +28,15 @@ function enter(data){
 function signedIn(data){window.location.hash='dashboard';enter(data);}
 function signedOut(){session=null;cleanup();generation++;app.replaceChildren(Login(signedIn));}
 function shell(){
-  const links=[['dashboard','Visão da rede','◫'],['dispositivos','Dispositivos','▤'],['historico','Histórico de falhas','◷'],['relatorios','Relatórios','↓'],['empresa','Empresa','▦'],...(session.usuario.papel==='ADMIN'?[['coletores','Coletores','⇅'],['usuarios','Equipe','◎']]:[])];
+  const links=[['dashboard','Visão da rede','pulse'],['dispositivos','Dispositivos','server'],['historico','Histórico de falhas','clock'],['relatorios','Relatórios','download'],['empresa','Empresa','building'],...(session.usuario.papel==='ADMIN'?[['coletores','Coletores','antenna'],['usuarios','Equipe','users']]:[])];
   // Below 850 px the navigation collapses behind a menu button (styles.css); on wider screens the button is hidden.
-  const menuButton=button([el('span',{'aria-hidden':'true'},'☰'),'Menu'],()=>setMenu(menuButton.getAttribute('aria-expanded')!=='true'),'menu-button',{'aria-expanded':'false','aria-controls':'main-nav'});
-  app.replaceChildren(el('div',{className:'app-layout'},
+  const menuButton=button([icon('menu'),'Menu'],()=>setMenu(menuButton.getAttribute('aria-expanded')!=='true'),'menu-button',{'aria-expanded':'false','aria-controls':'main-nav'});
+  // Hash routing owns "#...": the skip link moves focus instead of changing the route.
+  const skip=el('a',{href:'#',className:'skip-link',onclick:e=>{e.preventDefault();document.querySelector('#content').focus();}},'Ir para o conteúdo');
+  app.replaceChildren(skip,el('div',{className:'app-layout'},
     el('aside',{className:'sidebar'},el('div',{className:'sidebar-head'},el('a',{href:'#dashboard',className:'brand'},brandLogo(),el('span',{'aria-hidden':'true'},'EdgeHealth')),menuButton),
-      el('p',{className:'nav-caption'},'ESPAÇO DA EMPRESA'),el('nav',{id:'main-nav','aria-label':'Navegação principal',onclick:e=>{if(e.target.closest('a'))setMenu(false);}},links.map(([key,text,icon])=>el('a',{href:`#${key}`,dataset:{route:key}},el('span',{'aria-hidden':'true'},icon),text))),
-      el('div',{className:'sidebar-bottom'},el('span',{className:'small'},'Conectividade com contexto'),el('strong',{},'EdgeHealth / MVP'))),
-    el('div',{className:'workspace'},el('header',{className:'topbar'},el('div',{},el('span',{className:'muted small'},'EMPRESA'),el('strong',{id:'company-name'},session.empresa.nome_fantasia)),
+      el('nav',{id:'main-nav','aria-label':'Navegação principal',onclick:e=>{if(e.target.closest('a'))setMenu(false);}},links.map(([key,text,symbol])=>el('a',{href:`#${key}`,dataset:{route:key}},icon(symbol),text)))),
+    el('div',{className:'workspace'},el('header',{className:'topbar'},el('div',{},el('strong',{id:'company-name'},session.empresa.nome_fantasia)),
       el('div',{className:'actions'},el('span',{className:'user-name'},session.usuario.nome),button('Sair',logout,'ghost'))),el('main',{id:'content',tabIndex:-1}),
       el('footer',{className:'app-footer muted small'},el('a',{href:'/termos.html',target:'_blank',rel:'noopener'},'Termos de Uso'),' · ',el('a',{href:'/privacidade.html',target:'_blank',rel:'noopener'},'Aviso de Privacidade')))))
 }

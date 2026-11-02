@@ -1,7 +1,7 @@
 import {test,beforeEach,afterEach} from 'node:test';
 import assert from 'node:assert/strict';
 import {JSDOM} from 'jsdom';
-import {el,form,table,confirmAction,brandLogo} from '../src/ui/dom.js';
+import {el,form,table,confirmAction,brandLogo,port,badge,human} from '../src/ui/dom.js';
 import {apiFetch} from '../src/services/api.js';
 
 let dom;
@@ -74,6 +74,34 @@ test('confirmation dialog is labelled, focuses Cancelar and closing it (Esc) nev
   await new Promise(r=>setTimeout(r,0));
   assert.equal(ran,false);
   assert.equal(document.querySelector('dialog'),null);
+});
+
+test('panel headline states the network in plain words, worst news first',async()=>{
+  const {networkSummary:say}=await import('../src/pages/Dashboard.js');
+  const base={total:3,online:0,instaveis:0,offline:0,sem_coleta:0};
+  assert.match(say({...base,total:0}),/Cadastre o primeiro/);
+  assert.equal(say({...base,online:3}),'Todos os 3 dispositivos estão online.');
+  assert.equal(say({...base,online:1,offline:1,instaveis:1}),'1 dispositivo offline e 1 instável agora.');
+  assert.equal(say({...base,online:1,instaveis:2}),'2 dispositivos instáveis agora.');
+  assert.equal(say({...base,sem_coleta:3}),'3 dispositivos aguardam a primeira medição.');
+  assert.equal(say({...base,online:2,sem_coleta:1}),'Tudo online. 1 dispositivo aguarda a primeira medição.');
+});
+
+test('incident headline says what, where and for how long; API codes are translated only for reading',async()=>{
+  const {incidentSummary:say}=await import('../src/pages/Falha.js');
+  const f={dispositivo:'Impressora',tipo:'INDISPONIBILIDADE',estado:'ABERTA',duracao_segundos:125};
+  assert.equal(say(f),'Impressora está offline há 2min 5s.');
+  assert.equal(say({...f,tipo:'INSTABILIDADE',estado:'ENCERRADA'}),'Impressora ficou instável por 2min 5s.');
+  const b=badge('MEDIA');assert.equal(b.textContent,'Média');assert.ok(b.classList.contains('MEDIA'));
+  assert.equal(human('CODIGO_NOVO'),'CODIGO_NOVO');
+});
+
+test('a port is a real button only when it selects a device',()=>{
+  const clicks=[];
+  const device=port('OFFLINE',{'aria-label':'Impressora: offline',onclick:()=>clicks.push(1)},'button');
+  assert.equal(device.tagName,'BUTTON');assert.equal(device.type,'button');assert.ok(device.classList.contains('OFFLINE'));
+  device.click();assert.equal(clicks.length,1);
+  assert.equal(port(null).tagName,'SPAN');assert.ok(port(null).classList.contains('SEM_COLETA'));
 });
 
 test('brand logo has an accessible name',()=>{

@@ -1,4 +1,4 @@
-import { el,input,label,select,button,pageHeader,table,badge,date,duration,params,toast } from '../ui/dom.js';
+import { el,input,label,select,button,pageHeader,table,badge,date,duration,params,toast,human } from '../ui/dom.js';
 import { apiFetch } from '../services/api.js';
 export async function Historico(){
   const devices=await apiFetch('/dispositivos?arquivados=1');
@@ -10,7 +10,7 @@ export async function Historico(){
   const load=async()=>{
     const result=await apiFetch(`/falhas?${params({dispositivo_id:device.value,estado:state.value,severidade:severity.value,inicio:start.value,fim:end.value,pagina:page,limite:25})}`);
     body.replaceChildren(table(['Dispositivo','Tipo','Situação','Severidade','Início','Duração'],result.items.map(f=>[
-      el('a',{href:`#falha/${f.id}`,className:'text-link'},f.dispositivo),f.tipo,badge(f.estado,f.estado==='ABERTA'?'INSTAVEL':'ONLINE'),badge(f.severidade),date(f.inicio),duration(f.duracao_segundos)
+      el('a',{href:`#falha/${f.id}`,className:'text-link'},f.dispositivo),human(f.tipo),badge(f.estado,f.estado==='ABERTA'?'INSTAVEL':'ONLINE'),badge(f.severidade),date(f.inicio),duration(f.duracao_segundos)
     ])));
     paging.replaceChildren(el('span',{className:'muted'},`${result.total} ocorrências · Página ${page}`),el('div',{className:'actions'},button('Anterior',()=>{page--;load().catch(e=>toast(e.message,true));},'secondary',{disabled:page===1}),button('Próxima',()=>{page++;load().catch(e=>toast(e.message,true));},'secondary',{disabled:page*25>=result.total})));
   };
