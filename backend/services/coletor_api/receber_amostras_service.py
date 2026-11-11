@@ -1,3 +1,4 @@
+# Caso de uso: receber o lote de medições do coletor
 import logging
 from datetime import timedelta
 from itertools import groupby
@@ -13,10 +14,9 @@ from .registrar_erro_coletor_service import RegistrarErroColetorService
 log = logging.getLogger(__name__)
 
 
+# Recebimento de amostras
 class ReceberAmostrasService:
-    """Idempotent ingestion of a batch: every sample gets ACEITA, ATRASADA, DUPLICADA, REJEITADA
-    or TENTAR_NOVAMENTE (the collector keeps it queued and retries)."""
-
+    # Processa o lote e responde cada amostra
     def executar(self, coletor, dados):
         cfg = current_app.config
         samples = dados.get('amostras', [])
@@ -54,10 +54,10 @@ class ReceberAmostrasService:
             results.extend(self._processar_dispositivo(coletor, device_id, list(group)))
         return dict(recebidas=len(samples), resultados=results, servidor_em=iso(utcnow()))
 
+    # Grava as amostras de um dispositivo com a reserva
     def _processar_dispositivo(self, coletor, device_id, group):
         owner = ReservarDispositivoService().executar(device_id, coletor=coletor)
         if not owner:
-            # Lease held by a concurrent request: the collector keeps the samples queued and retries.
             return [dict(id=uid, resultado='TENTAR_NOVAMENTE', motivo='dispositivo em processamento') for _, _, uid, _ in group]
         out = []
         try:

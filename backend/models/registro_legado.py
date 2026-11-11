@@ -1,10 +1,11 @@
+# Model dos registros importados do protótipo antigo
 from sqlalchemy import CheckConstraint
 from app.extensions import db
 from .base import BaseModel, utcnow
 
 
+# Tabela registros_legados
 class RegistroLegado(BaseModel):
-    """Quarantined source records, never mixed with measured monitoring history."""
     __tablename__ = 'registros_legados'
     id = db.Column(db.Integer, primary_key=True)
     fonte_sha256 = db.Column(db.String(64), nullable=False)

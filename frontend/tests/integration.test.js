@@ -1,3 +1,4 @@
+// Testes de integração do site com a API
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
@@ -61,8 +62,6 @@ test('interface completa usa a API HTTP e SQLite migrado, sem respostas HTTP sim
   for(const key of ['window','document','Node','Event','FormData','MutationObserver'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true,writable:true});
   dom.window.HTMLDialogElement.prototype.showModal=function(){this.open=true;};
   dom.window.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new Event('close'));};
-  // Canvas rendering is not provided by jsdom. Only this drawing surface is a
-  // test double; chart datasets and all HTTP responses come from the real API.
   globalThis.ResizeObserver=class{observe(){}unobserve(){}disconnect(){}};
   const contexts=new WeakMap();
   dom.window.HTMLCanvasElement.prototype.getContext=function(){
@@ -101,7 +100,6 @@ test('interface completa usa a API HTTP e SQLite migrado, sem respostas HTTP sim
     mount(await Empresa(session));
     await submit({nome_fantasia:'Empresa atualizada',telefone:'31999999999'});
     assert.equal((await apiFetch('/empresa')).nome_fantasia,'Empresa atualizada');
-    // Costs: live cost-per-hour preview, then saved as exact decimals (all day, every day: deterministic tests).
     const costs=document.querySelector('#custos');
     const salary=costs.querySelector('[name=salario_medio]');salary.value='3.000,00';salary.dispatchEvent(new Event('input'));
     for(let i=0;i<50&&!/R\$/.test(costs.querySelector('.cost-preview').textContent);i++)await new Promise(r=>setTimeout(r,100));
@@ -137,7 +135,6 @@ test('interface completa usa a API HTTP e SQLite migrado, sem respostas HTTP sim
     button('Coletar').click();await until(()=>requests.some(r=>r.path.endsWith('/coletas')&&r.status===202),'Coleta não solicitada');
     assert.equal((await apiFetch('/metricas')).total,0);
     await collect(4,2.5);assert.equal((await apiFetch(`/dispositivos/${deviceId}`)).status,'ONLINE');
-    // "Impacto no negócio" follows the type until edited: a printer is 10 people, 30% (custom).
     button('Cadastrar dispositivo').click();await until(()=>document.querySelector('dialog form'),'Formulário não abriu');
     const dialog=document.querySelector('dialog'),tipo=dialog.querySelector('[name=tipo]');
     tipo.value='Impressora';tipo.dispatchEvent(new Event('input'));
@@ -148,7 +145,7 @@ test('interface completa usa a API HTTP e SQLite migrado, sem respostas HTTP sim
     assert.equal(dialog.querySelector('[name=perda_opcao]:checked').value,'100');
     const people=dialog.querySelector('[name=usuarios_dependentes]');people.value='3';people.dispatchEvent(new Event('input'));
     tipo.value='Roteador';tipo.dispatchEvent(new Event('input'));await pause(450);
-    assert.equal(people.value,'3');  // edited by the person: the type no longer overwrites it
+    assert.equal(people.value,'3');
     dialog.querySelector('[value="10"][name=perda_opcao]').click();
     await submit({nome:'Caixa da loja',ip:'127.0.0.9',localizacao:'Loja',receita_hora_dependente:'1.234,50'},dialog);
     const pos=(await apiFetch('/dispositivos')).find(d=>d.nome==='Caixa da loja');
@@ -166,7 +163,6 @@ test('interface completa usa a API HTTP e SQLite migrado, sem respostas HTTP sim
     await submit({usuarios_afetados:'60',custos_diretos:'250,00',observacao:'Informação do responsável de TI'});
     assert.equal((await apiFetch(`/falhas/${failureId}`)).severidade,'CRITICA');
     assert.match(document.querySelector('#app').textContent,/Estimativa informada pela equipe/);
-    // Loss estimate: the value and the open calculation, with the disclaimer.
     const loss=document.querySelector('.loss-panel').textContent,estimate=(await apiFetch(`/falhas/${failureId}`)).prejuizo;
     assert.match(loss,/60 pessoas × R\$ 23,18\/h × 50% × [\d,]+ h de expediente \+ R\$ 250,00 de custos diretos/);
     assert.match(loss,/Estimativa baseada nos custos informados pela empresa/);
@@ -178,7 +174,6 @@ test('interface completa usa a API HTTP e SQLite migrado, sem respostas HTTP sim
     await until(()=>document.querySelectorAll('.stat strong').length===5,'Dashboard não desenhou');
     assert.deepEqual([...document.querySelectorAll('.stat strong')].map(n=>n.textContent),['1','0','1','0','1']);
     const canvas=document.querySelectorAll('canvas');assert.equal(canvas.length,2);
-    // Numbers are in place before the page is attached (no layout shift); charts need an attached canvas and come next.
     await until(()=>Chart.getChart(canvas[0])&&Chart.getChart(canvas[1]),'Gráficos não desenhados');
     assert.match(document.querySelector('.cost-summary').textContent,/R\$\s[\d.]+,\d{2}/);
     assert.match(document.querySelector('.cost-summary').textContent,/Servidor atualizado/);
@@ -216,7 +211,6 @@ test('interface completa usa a API HTTP e SQLite migrado, sem respostas HTTP sim
     const [collector]=await apiFetch('/coletores');
     assert.equal(collector.estado,'NUNCA_CONECTADO');assert.ok(!('token' in collector));
     button('Fechar',document.querySelector('dialog')).click();
-    // The collector authenticates with its own credential, never with the user cookie.
     const config=await nativeFetch(base+'/api/coletor/configuracao',{headers:{Authorization:'Bearer '+token}});
     assert.equal(config.status,200);assert.deepEqual((await config.json()).dispositivos,[]);
     mount(await Dispositivos(session));button('Editar').click();await until(()=>document.querySelector('dialog'),'Edição não abriu');
@@ -247,7 +241,6 @@ test('interface completa usa a API HTTP e SQLite migrado, sem respostas HTTP sim
     assert.equal((await apiFetch('/dispositivos')).length,0);
     assert.equal((await apiFetch('/metricas')).total,9);
     assert.equal((await apiFetch('/falhas')).total,1);
-    // Restore from the "Incluir arquivados" view, then archive again.
     const include=document.querySelector('[name=arquivados]');include.checked=true;include.dispatchEvent(new Event('change'));
     await until(()=>[...document.querySelectorAll('button')].some(b=>b.textContent==='Desarquivar'),'Botão Desarquivar ausente');
     button('Desarquivar').click();
@@ -256,7 +249,7 @@ test('interface completa usa a API HTTP e SQLite migrado, sem respostas HTTP sim
     await until(()=>!document.querySelector('dialog'),'Desarquivamento pendente');
     const restored=await apiFetch('/dispositivos');
     assert.equal(restored.length,1);assert.equal(restored[0].arquivado_em,null);assert.equal(restored[0].status,null);
-    assert.equal((await apiFetch('/metricas')).total,9);  // history preserved
+    assert.equal((await apiFetch('/metricas')).total,9);
     await until(()=>[...document.querySelectorAll('button')].some(b=>b.textContent==='Arquivar'),'Lista não atualizou');
     button('Arquivar').click();button('Arquivar',document.querySelector('dialog')).click();
     await until(()=>!document.querySelector('dialog'),'Novo arquivamento pendente');

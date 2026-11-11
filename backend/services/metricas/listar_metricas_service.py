@@ -1,3 +1,4 @@
+# Caso de uso: listar medições por período
 from werkzeug.exceptions import BadRequest
 from app import validation as v
 from repositories import MetricaRepository
@@ -5,12 +6,11 @@ from services.comum.serializador import Serializador
 from services.dispositivos.obter_dispositivo_service import ObterDispositivoService
 
 
+# Lista de métricas
 class ListarMetricasService:
-    """Samples by period (default: last 7 days), optionally of one device and one metric type.
-    Parameters are the raw query-string texts; they are validated here."""
-
     TIPOS = ('latencia', 'perda_pacotes', 'disponibilidade')
 
+    # Valida os filtros e devolve a página
     def executar(self, empresa_id, dispositivo_id=None, tipo=None, inicio=None, fim=None, pagina=None, limite=None):
         device_id = v.query_int(dispositivo_id, 'dispositivo_id')
         if device_id:
@@ -23,6 +23,7 @@ class ListarMetricasService:
         rows, total = MetricaRepository.por_periodo(empresa_id, device_id, start, end, page, limit)
         return dict(items=[self._selecionar(m, tipo) for m in rows], total=total, pagina=page, limite=limit)
 
+    # Mantém só o tipo de métrica pedido
     @staticmethod
     def _selecionar(metrica, tipo):
         result = Serializador.metrica(metrica)

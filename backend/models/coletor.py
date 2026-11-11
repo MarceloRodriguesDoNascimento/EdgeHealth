@@ -1,9 +1,10 @@
+# Model do coletor remoto instalado na rede da empresa
 from app.extensions import db
 from .base import BaseModel, utcnow
 
 
+# Tabela coletores
 class Coletor(BaseModel):
-    """Remote measurement agent running inside a company network. Never a user."""
     __tablename__ = 'coletores'
     id = db.Column(db.Integer, primary_key=True)
     empresa_id = db.Column(db.Integer, db.ForeignKey('empresas.id', ondelete='RESTRICT'), nullable=False, index=True)

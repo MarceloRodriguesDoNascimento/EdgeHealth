@@ -1,3 +1,4 @@
+# Caso de uso: salvar os custos da empresa
 from decimal import Decimal
 from werkzeug.exceptions import BadRequest
 from app import validation as v
@@ -5,9 +6,9 @@ from models import Empresa
 from services.comum.serializador import Serializador
 
 
+# Configuração de custos
 class ConfigurarCustosService:
-    """Average salary, charges, hours per month, staff, working hours and time zone of the company."""
-
+    # Valida e grava salário, funcionários e expediente
     def executar(self, empresa_id, dados):
         company = Empresa.buscar_por_id(empresa_id)
         if 'salario_medio' in dados: company.salario_medio = v.optional(dados['salario_medio'], v.decimal_value, 'Salário médio')

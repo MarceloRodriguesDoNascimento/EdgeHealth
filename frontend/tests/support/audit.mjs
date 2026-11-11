@@ -1,6 +1,4 @@
-// Responsive audit: every screen at 360/390/414/768/1024 px, plus 390 px screenshots.
-//   node tests/support/audit.mjs antes|depois
-// Output: ../tests/responsivo/<label>/ (audit.json, audit.md and PNGs; git-ignored).
+// Auditoria de layout responsivo
 import {mkdirSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {startApi, launch, seed, auditPage, settle} from './live.js';
@@ -34,8 +32,6 @@ export function screens(failureId) {
   ];
 }
 
-// One browser context per account and width: below 768 px the context emulates a phone
-// (isMobile, touch, overlay scrollbars), otherwise a classic desktop window.
 export async function contexts(browser, base, data) {
   const states = {};
   for (const [who, login] of [['anon', null], ['admin', data.adminLogin], ['tech', data.technicianLogin]]) {

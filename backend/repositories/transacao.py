@@ -1,23 +1,25 @@
+# Controle de transação usado pelos Services
 from app.extensions import db
 
 
+# Operações de transação
 class Transacao:
-    """Transaction boundary used by the services (they never touch the session directly)."""
-
+    # Grava as alterações (commit)
     @staticmethod
     def confirmar():
         db.session.commit()
 
+    # Desfaz as alterações (rollback)
     @staticmethod
     def desfazer():
         db.session.rollback()
 
+    # Envia as alterações sem confirmar (flush)
     @staticmethod
     def enviar():
-        """Sends pending changes (flush) so generated ids are available inside the transaction."""
         db.session.flush()
 
+    # Libera a sessão do banco
     @staticmethod
     def encerrar():
-        """Releases the session/connection, e.g. before a network probe."""
         db.session.remove()

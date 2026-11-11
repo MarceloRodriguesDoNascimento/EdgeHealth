@@ -1,4 +1,4 @@
-"""Routes of the API: URL + HTTP method -> controller method (with its authentication)."""
+# Mapa de todas as rotas da API (URL, método e Controller)
 from flask import Blueprint
 from app.security import require_auth, require_collector
 from .auth_controller import AuthController
@@ -16,7 +16,7 @@ from .usuario_controller import UsuarioController
 
 api = Blueprint('api', __name__, url_prefix='/api')
 
-publica = lambda fn: fn  # noqa: E731
+publica = lambda fn: fn
 sessao = require_auth()
 sessao_sem_termos = require_auth(terms=False)
 admin = require_auth(admin=True)
@@ -34,7 +34,6 @@ relatorio = RelatorioController()
 coletor = ColetorController()
 coletor_api = ColetorApiController()
 
-# (rule, HTTP method, endpoint, access, controller method)
 ROTAS = [
     ('/health', 'GET', 'health', publica, health.verificar),
     ('/termos', 'GET', 'terms_version', publica, auth.versao_termos),
@@ -77,7 +76,6 @@ ROTAS = [
     ('/dashboard', 'GET', 'dashboard_endpoint', sessao, dashboard.obter),
     ('/relatorios/exportar', 'GET', 'report', sessao, relatorio.exportar),
 
-    # Read-only for every member (needed to assign devices); management is admin-only.
     ('/coletores', 'GET', 'collectors', sessao, coletor.listar),
     ('/coletores', 'POST', 'create_collector', admin, coletor.cadastrar),
     ('/coletores/<int:id>/rotacionar', 'POST', 'rotate_collector', admin, coletor.rotacionar),

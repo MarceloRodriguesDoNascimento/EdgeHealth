@@ -1,14 +1,14 @@
+# Gera a credencial do coletor (ehc_...)
 import secrets
 from services.comum.hash_token import HashToken
 
 
+# Geração de credencial
 class CredencialColetor:
-    """Bearer credential of a collector: shown once, stored only as SHA-256 plus a display prefix."""
-
     PREFIXO = 'ehc_'
 
+    # Cria token, hash e prefixo
     @classmethod
     def gerar(cls):
-        """(plain token, hash to store, prefix to display)."""
         token = cls.PREFIXO + secrets.token_urlsafe(32)
         return token, HashToken.sha256(token), token[:12]

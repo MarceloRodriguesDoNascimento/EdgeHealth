@@ -1,3 +1,4 @@
+# Caso de uso: revogar coletor
 import logging
 from models import utcnow
 from services.comum.serializador import Serializador
@@ -6,9 +7,9 @@ from .obter_coletor_service import ObterColetorService
 log = logging.getLogger(__name__)
 
 
+# Revogação de coletor
 class RevogarColetorService:
-    """Permanently disables the collector credential (idempotent)."""
-
+    # Desativa a credencial do coletor
     def executar(self, empresa_id, id):
         c = ObterColetorService().executar(empresa_id, id)
         if not c.revogado_em:

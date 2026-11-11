@@ -1,12 +1,13 @@
+# Caso de uso: anonimizar uma conta (LGPD)
 import secrets
 from werkzeug.security import generate_password_hash
 from models import Empresa, Usuario, utcnow
 from repositories import AutenticacaoRepository, UsuarioRepository
 
 
+# Anonimização
 class AnonimizarUsuarioService:
-    """Data-subject request: removes name/e-mail of an account while keeping company history."""
-
+    # Troca nome e e-mail por dados anônimos
     def executar(self, email):
         user = Usuario.buscar_um_por(email=email)
         if not user:

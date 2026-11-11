@@ -1,3 +1,4 @@
+# Caso de uso: somar o prejuízo de várias falhas
 from decimal import Decimal
 from models import utcnow
 from repositories import RankingCustoRepository
@@ -5,9 +6,9 @@ from .calculadora_prejuizo import CalculadoraPrejuizo
 from .identificar_grupo_compartilhado_service import IdentificarGrupoCompartilhadoService
 
 
+# Total de prejuízo
 class CalcularPrejuizoTotalService:
-    """Company total without double counting shared outages, and the top 5 devices by loss."""
-
+    # Soma sem repetir quedas compartilhadas e monta o top 5
     def executar(self, falhas, empresa, agora=None):
         calc = CalculadoraPrejuizo
         if calc.custo_hora(empresa) is None:
@@ -29,7 +30,6 @@ class CalcularPrejuizoTotalService:
         by_device = {}
         for f in falhas:
             by_device[f.dispositivo_id] = by_device.get(f.dispositivo_id, Decimal(0)) + individual[f.id]
-        # Values are whole cents (sums of amounts rounded to cents): exact integers for the SQL ranking.
         top = RankingCustoRepository.top_dispositivos({k: int(v * 100) for k, v in by_device.items()}, limite=5)
         return dict(configurado=True, total=calc.dinheiro(total), falhas=len(falhas), em_andamento=any(f.estado == 'ABERTA' for f in falhas),
                     individual={k: calc.dinheiro(v) for k, v in individual.items()},

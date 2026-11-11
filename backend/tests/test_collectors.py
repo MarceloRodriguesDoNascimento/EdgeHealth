@@ -1,3 +1,4 @@
+# Testes da API dos coletores
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
@@ -48,7 +49,6 @@ def test_credentials_are_hashed_rotated_and_revoked(app, signed):
     client = app.test_client()
     assert client.get('/api/coletor/configuracao').status_code == 401
     assert client.get('/api/coletor/configuracao', headers=bearer('ehc_invalid')).status_code == 401
-    # A user session cookie is not a collector credential.
     assert signed.get('/api/coletor/configuracao').status_code == 401
     assert client.get('/api/coletor/configuracao', headers=bearer(token)).status_code == 200
     rotated = signed.post(f'/api/coletores/{collector["id"]}/rotacionar', json={}, headers=auth_headers(signed)).json
@@ -66,13 +66,12 @@ def test_only_admins_manage_collectors_and_tenants_are_isolated(app, signed, dev
     tech.post('/api/auth/login', json={'email': 'tec@a.example', 'senha': 'senha-tecnico-1'})
     tech.post('/api/auth/aceite-termos', json={'aceite_termos': True}, headers=auth_headers(tech))
     assert tech.post('/api/coletores', json={'nome': 'x'}, headers=auth_headers(tech)).status_code == 403
-    assert tech.get('/api/coletores').status_code == 200  # read-only list, never the credential
+    assert tech.get('/api/coletores').status_code == 200
     collector_a, token_a = new_collector(signed)
     other = app.test_client()
     assert register(other, email='admin@b.example', cnpj='11444777000161', name='Empresa B').status_code == 201
     collector_b, token_b = new_collector(other, 'Coletor B')
     device_b = other.post('/api/dispositivos', json={'nome': 'B', 'ip': '10.0.0.2', 'tipo': 'Switch', 'localizacao': 'B'}, headers=auth_headers(other)).json
-    # A company cannot assign, rotate, revoke or see another company's collector.
     assert signed.put(f'/api/dispositivos/{device["id"]}', json={'coletor_id': collector_b['id']}, headers=h).status_code == 404
     assert signed.post(f'/api/coletores/{collector_b["id"]}/revogar', json={}, headers=h).status_code == 404
     assert [c['id'] for c in signed.get('/api/coletores').json] == [collector_a['id']]
@@ -80,7 +79,6 @@ def test_only_admins_manage_collectors_and_tenants_are_isolated(app, signed, dev
     assign(other, device_b['id'], collector_b['id'])
     config = app.test_client().get('/api/coletor/configuracao', headers=bearer(token_a)).json
     assert [d['id'] for d in config['dispositivos']] == [device['id']]
-    # Collector A cannot write samples or errors for company B's device.
     result = send(app.test_client(), token_a, [sample(device_b['id'])]).json
     assert result['resultados'][0]['resultado'] == 'REJEITADA'
     assert send(app.test_client(), token_a, errors=[{'dispositivo_id': device_b['id'], 'tipo': 'FALHA_COLETOR'}]).status_code == 400
@@ -95,7 +93,6 @@ def test_ingestion_runs_full_incident_lifecycle_without_duplicates(app, signed, 
     client = app.test_client()
     first = sample(device['id'], seconds_ago=100)
     assert send(client, token, [first]).json['resultados'][0]['resultado'] == 'ACEITA'
-    # Resending the same batch after a lost response is idempotent.
     assert send(client, token, [first]).json['resultados'][0]['resultado'] == 'DUPLICADA'
     outage = [sample(device['id'], received=0, seconds_ago=90 - i * 10) for i in range(4)]
     results = send(client, token, outage + [outage[0]]).json['resultados']
@@ -113,7 +110,6 @@ def test_ingestion_runs_full_incident_lifecycle_without_duplicates(app, signed, 
         metric = db.session.scalar(select(Metrica).where(Metrica.amostra_uid == first['id']))
         assert metric.coletor_id == collector['id'] and metric.recebida_em and metric.latencia_ms == 2.0
         assert db.session.scalar(select(func.count()).select_from(Metrica)) == 7
-    # A delayed sample from the outage window is kept as history but cannot reopen the incident.
     late = send(client, token, [sample(device['id'], received=0, seconds_ago=95)]).json['resultados'][0]
     assert late['resultado'] == 'ATRASADA'
     with app.app_context():
@@ -162,7 +158,6 @@ def test_collector_problems_are_not_device_failures(app, signed, device):
         assert c.versao == '1.0.0' and c.fila_pendente == 3
         c.ultimo_contato = utcnow() - timedelta(seconds=app.config['COLLECTOR_STALE_SECONDS'] + 1)
         db.session.commit()
-    # A silent collector is reported as stale; it does not fabricate OFFLINE devices.
     dashboard = signed.get('/api/dashboard').json
     assert dashboard['coletores'][0]['estado'] == 'DESATUALIZADO'
     assert dashboard['indicadores']['offline'] == 0 and dashboard['indicadores']['falhas_abertas'] == 0

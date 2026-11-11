@@ -1,3 +1,4 @@
+// Testes das telas
 import {test,beforeEach,afterEach} from 'node:test';
 import assert from 'node:assert/strict';
 import {JSDOM} from 'jsdom';
@@ -70,7 +71,7 @@ test('confirmation dialog is labelled, focuses Cancelar and closing it (Esc) nev
   assert.equal(document.getElementById(dialog.getAttribute('aria-labelledby')).textContent,'Sair do EdgeHealth?');
   const cancel=[...dialog.querySelectorAll('button')].find(b=>b.textContent==='Cancelar');
   assert.equal(cancel.autofocus,true);
-  dialog.close();  // what the browser does on Esc for a modal <dialog>
+  dialog.close();
   await new Promise(r=>setTimeout(r,0));
   assert.equal(ran,false);
   assert.equal(document.querySelector('dialog'),null);

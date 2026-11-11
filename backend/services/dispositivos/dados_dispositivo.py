@@ -1,12 +1,13 @@
+# Valida e aplica os campos do formulário de dispositivo
 from app import validation as v
 from models import Empresa, utcnow
 from services.coletores.validar_coletor_atribuivel_service import ValidarColetorAtribuivelService
 from services.custos.categoria_dispositivo import CategoriaDispositivo
 
 
+# Campos do dispositivo
 class DadosDispositivo:
-    """Validates and applies the fields of the device form (shared by create and update)."""
-
+    # Valida e copia os campos para o dispositivo
     @classmethod
     def aplicar(cls, dispositivo, dados, empresa_id, criando):
         if 'nome' in dados: dispositivo.nome = v.string(dados['nome'], 'Nome', 100)
@@ -16,16 +17,14 @@ class DadosDispositivo:
         if 'coletor_id' in dados:
             collector_id = ValidarColetorAtribuivelService().executar(empresa_id, dados['coletor_id'])
             if collector_id != dispositivo.coletor_id:
-                # A different measurement point: the next cycle collects from the new origin.
                 dispositivo.coletor_id = collector_id
                 dispositivo.erro_coleta = None
                 dispositivo.proxima_coleta = utcnow()
         cls.impacto_negocio(dispositivo, dados, criando)
 
+    # Pessoas, perda e receita que dependem do dispositivo
     @staticmethod
     def impacto_negocio(dispositivo, dados, criando):
-        """People, productivity loss and direct revenue that depend on the device. A new device without
-        these fields gets the defaults for its type (editable); explicit null clears a value."""
         if 'usuarios_dependentes' in dados:
             dispositivo.usuarios_dependentes = v.optional(dados['usuarios_dependentes'], v.integer, 'Pessoas que usam o aparelho')
         if 'perda_produtividade_pct' in dados:

@@ -1,9 +1,10 @@
+# Transforma credenciais em SHA-256 antes de guardar
 import hashlib
 
 
+# Hash de credenciais
 class HashToken:
-    """Credentials (session, CSRF, collector) are stored only as their SHA-256."""
-
+    # Calcula o SHA-256 do texto
     @staticmethod
     def sha256(valor):
         return hashlib.sha256(valor.encode()).hexdigest()

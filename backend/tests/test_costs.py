@@ -1,4 +1,4 @@
-"""Financial loss estimate: cost per hour, working hours, shared outages and the API around it."""
+# Testes da estimativa de prejuízo
 import csv
 import io
 import json
@@ -14,8 +14,6 @@ from models import Diagnostico, Dispositivo, Empresa, Falha, Impacto, utcnow
 from services.custos import CalculadoraPrejuizo, CalcularPrejuizoTotalService, EstimarPrejuizoFalhaService
 from conftest import auth_headers, register
 
-# 2026-10-07 is a Wednesday; São Paulo is UTC-3 all year (no DST since 2019). Working hours 08-18 local
-# = 11:00-21:00 UTC.
 WED = datetime(2026, 10, 7)
 COSTS = {'salario_medio': '3000', 'total_funcionarios': 40, 'expediente': {'dias': [1, 2, 3, 4, 5], 'inicio': '08:00', 'fim': '18:00'}}
 
@@ -58,7 +56,7 @@ def estimate(app, failure_id, now=None):
 
 def test_cost_per_hour_is_computed_from_salary_charges_and_hours(configured):
     c = configured.get('/api/empresa').json['custos']
-    assert c['configurado'] and c['custo_hora'] == '23.18'  # 3000 × 1.7 ÷ 220 = 23.1818…
+    assert c['configurado'] and c['custo_hora'] == '23.18'
     assert c['fator_encargos'] == '1.7' and c['horas_mes'] == 220 and c['expediente']['dias'] == [1, 2, 3, 4, 5]
     assert c['assistente'] == 'CONCLUIDO'
 
@@ -73,13 +71,12 @@ def test_cost_preview_uses_the_server_formula_and_model_defaults_without_saving(
     assert signed.post('/api/empresa/custos/previa', json={'salario_medio': ''}, headers=h).json['custo_hora'] is None
     assert signed.post('/api/empresa/custos/previa', json={'salario_medio': '-1'}, headers=h).status_code == 400
     assert signed.post('/api/empresa/custos/previa', json={'horas_mes': 0, 'salario_medio': '1'}, headers=h).status_code == 400
-    assert signed.get('/api/empresa').json['custos']['configurado'] is False  # nothing saved
+    assert signed.get('/api/empresa').json['custos']['configurado'] is False
 
 
 def test_incident_entirely_inside_working_hours(app, configured, device):
     fid = make_failure(app, device['id'], WED.replace(hour=13), WED.replace(hour=15), users=25, loss=100, direct='250')
     e = estimate(app, fid)
-    # 2 h × 25 × 23.1818… × 100% = 1159.09 (exact Decimal, rounded once) + 250
     assert e['valor'] == '1409.09' and e['em_andamento'] is False
     assert e['detalhe']['horas_expediente'] == '2.00' and e['detalhe']['custo_hora'] == '23.18'
     assert e['conta'] == '25 pessoas × R$ 23,18/h × 100% × 2,0 h de expediente + R$ 250,00 de custos diretos'
@@ -87,10 +84,8 @@ def test_incident_entirely_inside_working_hours(app, configured, device):
 
 
 def test_only_the_part_inside_working_hours_counts(app, configured, device):
-    # 17:00 → 20:00 local: only 1 h before the end of the working day; the night adds nothing.
     fid = make_failure(app, device['id'], WED.replace(hour=20), WED.replace(hour=23), users=10, loss=50)
     assert estimate(app, fid)['detalhe']['horas_expediente'] == '1.00'
-    # Wednesday 17:00 → Thursday 09:00 local = 1 h + 1 h.
     fid2 = make_failure(app, device['id'], WED.replace(hour=20) + timedelta(days=7), WED.replace(hour=12) + timedelta(days=8), users=10, loss=50)
     assert estimate(app, fid2)['detalhe']['horas_expediente'] == '2.00'
 
@@ -107,7 +102,7 @@ def test_open_incident_is_a_partial_estimate_until_now(app, configured, device):
     fid = make_failure(app, device['id'], WED.replace(hour=12), users=4, loss=100)
     e = estimate(app, fid, now=WED.replace(hour=13, minute=30))
     assert e['em_andamento'] is True and e['detalhe']['horas_expediente'] == '1.50'
-    assert e['valor'] == '139.09'  # 1.5 × 4 × 23.1818…
+    assert e['valor'] == '139.09'
     assert e['detalhe']['calculado_ate'] == '2026-10-07T13:30:00Z'
 
 
@@ -119,12 +114,12 @@ def test_shared_outage_group_does_not_count_the_same_people_twice(app, configure
     e = estimate(app, ids[1])
     g = e['grupo']
     assert sorted(g['falhas']) == sorted(ids) and g['pessoas_consideradas'] == 25 and g['pessoas_somadas'] == 40
-    assert g['valor'] == '579.55'  # 1 h × 25 × 23.1818…, not 40 people
+    assert g['valor'] == '579.55'
     assert 'não a soma' in g['explicacao']
     with app.app_context():
         company = db.session.get(Empresa, devices[0]['empresa_id'])
         total = CalcularPrejuizoTotalService().executar(db.session.scalars(select(Falha)).all(), company)
-    assert total['total'] == '579.55'  # sum of the individual estimates would be 927.27
+    assert total['total'] == '579.55'
     assert [t['nome'] for t in total['top_dispositivos']] == ['Andar 1', 'Andar 2', 'Andar 3']
 
 
@@ -163,7 +158,7 @@ def test_money_is_exact_decimal_from_number_or_text(app, configured, device):
     assert r.json['custos']['salario_medio'] == '0.10'
     with app.app_context():
         raw = db.session.execute(text('SELECT salario_medio FROM empresas')).scalar()
-    assert raw == '0.10'  # stored as exact text, never a float
+    assert raw == '0.10'
 
 
 def test_technician_sees_but_cannot_edit_company_costs(app, configured):
@@ -183,7 +178,6 @@ def test_other_company_cannot_see_or_change_the_estimate(app, configured, device
     assert register(other, email='admin@b.example', cnpj='11444777000161', name='Empresa B').status_code == 201
     assert other.get(f'/api/falhas/{fid}').status_code == 404
     assert other.put(f'/api/falhas/{fid}/impacto', json={'custos_diretos': '1'}, headers=auth_headers(other)).status_code == 404
-    # 404 comes before payload errors: another company learns nothing about the incident from a 400
     for body in ({'campo_invalido': 1}, {'custos_diretos': '-1'}, ['nao', 'objeto']):
         assert other.put(f'/api/falhas/{fid}/impacto', json=body, headers=auth_headers(other)).status_code == 404
     assert other.post(f'/api/falhas/{fid}/explicacao-ia', json={'prompt': 'x'}, headers=auth_headers(other)).status_code == 404
@@ -221,8 +215,7 @@ def test_impact_users_override_the_device_and_direct_costs_are_saved(app, config
     assert r.status_code == 200 and r.json['impacto']['custos_diretos'] == '99.90'
     p = r.json['prejuizo']
     assert p['detalhe']['pessoas'] == 5 and p['detalhe']['origem_pessoas'] == 'informado na ocorrência'
-    assert p['valor'] == '215.81'  # 1 h × 5 × 23.1818… + 99.90
-    # Only direct costs: the people come from the device again (usuarios_afetados null).
+    assert p['valor'] == '215.81'
     r = configured.put(f'/api/falhas/{fid}/impacto', json={'usuarios_afetados': None}, headers=auth_headers(configured))
     assert r.json['prejuizo']['detalhe']['pessoas'] == 25
 
@@ -238,7 +231,6 @@ def test_report_has_the_estimate_column_and_the_total(app, configured, device):
 
 def test_dashboard_shows_the_30_day_total_and_top_devices(app, configured, device):
     now = utcnow()
-    # The most recent past Wednesday at noon: inside working hours whatever day the suite runs.
     start = (now - timedelta(days=(now.weekday() - 2) % 7 or 7)).replace(hour=15, minute=0, second=0, microsecond=0)
     make_failure(app, device['id'], start, start + timedelta(hours=2), users=25, loss=100)
     c = configured.get('/api/dashboard').json['custos']
@@ -247,7 +239,7 @@ def test_dashboard_shows_the_30_day_total_and_top_devices(app, configured, devic
 
 
 def test_cost_assistant_can_be_skipped_once(configured, client):
-    other = client  # same admin session: skipping after configuring keeps CONCLUIDO
+    other = client
     assert other.post('/api/empresa/custos/pular', json={}, headers=auth_headers(other)).json['custos']['assistente'] == 'CONCLUIDO'
 
 
@@ -257,7 +249,6 @@ def test_cost_assistant_skip_marks_it_as_skipped(signed):
 
 
 def test_upgrade_from_production_revision_keeps_data(tmp_path):
-    """bc4dfbaec175 (deployed) -> head: rows survive, defaults apply, nothing is configured by itself."""
     app = create_app({'TESTING': True, 'SQLALCHEMY_DATABASE_URI': 'sqlite:///' + str(tmp_path / 'prod.db')})
     migrations = str(Path(__file__).resolve().parents[1] / 'migrations')
     with app.app_context():

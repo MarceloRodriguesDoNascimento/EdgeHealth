@@ -1,9 +1,12 @@
+# Caso de uso: buscar um diagnóstico
 from werkzeug.exceptions import NotFound
 from repositories import DiagnosticoRepository
 from services.comum.serializador import Serializador
 
 
+# Busca de diagnóstico
 class ObterDiagnosticoService:
+    # Devolve o diagnóstico ou 404
     def executar(self, empresa_id, id):
         diag = DiagnosticoRepository.buscar_da_empresa(empresa_id, id)
         if not diag:

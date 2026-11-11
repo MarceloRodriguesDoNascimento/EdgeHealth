@@ -1,3 +1,4 @@
+# Arquivos que o Git não deve versionar (ambientes, builds, segredos)
 __pycache__/
 *.pyc
 .env
@@ -18,16 +19,13 @@ edgehealth-fila.tmp
 coletor.token
 deploy/pythonanywhere/*.zip
 *.token
-# Network lab (tests/lab): credentials, run outputs and evidence stay local
 tests/lab/.credenciais-lab.json
 tests/lab/execucao.log
 tests/lab/relatorio*.md
 tests/lab/evidencias/
 tests/lab/resultados/
 tests/lab/screenshots/
-# Responsive audit output (screenshots, ~9 MB): regenerate with node frontend/tests/support/audit.mjs
 tests/responsivo/
-# Windows collector build (collector/windows/build.ps1): the .exe is published only as a GitHub Release asset
 collector/.venv-build/
 collector/build/
 collector/dist/

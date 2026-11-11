@@ -1,5 +1,4 @@
-# Single-host deployment. Put a TLS reverse proxy (provider load balancer, Caddy, Nginx…)
-# in front of port 8000; the app trusts exactly one proxy hop (TRUST_PROXY=1).
+# Sobe o EdgeHealth com Docker Compose
 services:
   web:
     build: .

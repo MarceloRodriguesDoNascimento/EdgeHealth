@@ -1,1 +1,2 @@
-"""Measured samples (history)."""
+# Services de consulta das medições
+pass

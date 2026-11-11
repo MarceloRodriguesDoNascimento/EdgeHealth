@@ -1,16 +1,4 @@
-"""EdgeHealth collector for Windows: setup window, scheduled-task "service" and uninstaller.
-
-Wraps collector/edgehealth_collector.py without changing it: same Api, Queue and Collector,
-same protocol. Built into a single EdgeHealthColetor.exe with PyInstaller (see build.ps1).
-
-    EdgeHealthColetor.exe                     setup window (or status window when installed)
-    EdgeHealthColetor.exe --servico           collector loop, started by the scheduled task
-    EdgeHealthColetor.exe --instalar --url URL --token-file FILE   unattended install
-    EdgeHealthColetor.exe --parar | --iniciar | --desinstalar
-
-Data (config, credential, local queue, logs) lives in %ProgramData%\\EdgeHealth when run as
-administrator, otherwise in %LOCALAPPDATA%\\EdgeHealth. The credential is never logged.
-"""
+# Versão Windows do coletor, com janela de instalação
 import argparse
 import ctypes
 import hashlib
@@ -31,24 +19,20 @@ from xml.sax.saxutils import escape
 
 if not getattr(sys, 'frozen', False):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import edgehealth_collector as core  # noqa: E402  (protocol and loop, unchanged)
+import edgehealth_collector as core
 
-# Overridable (--pasta, --nome-tarefa) only to test an isolated install next to a real one.
 APP = 'EdgeHealth'
 TASK = 'EdgeHealth Coletor'
 EXE = 'EdgeHealthColetor.exe'
 DEFAULT_API = 'https://marcelodomingos.pythonanywhere.com'
-MAX_CLOCK_SKEW = 120  # COLLECTOR_MAX_CLOCK_SKEW_SECONDS: the API rejects samples beyond this
+MAX_CLOCK_SKEW = 120
 SYSTEM_SID, ADMINS_SID = 'S-1-5-18', 'S-1-5-32-544'
 NO_WINDOW = 0x08000000
 log = logging.getLogger('edgehealth.windows')
 
 
-# --- Transport -------------------------------------------------------------------------------
+# Usa os certificados HTTPS que vêm no .exe
 def use_bundled_certificates():
-    """Some Windows certificate stores reject the current Let's Encrypt chain ("certificate has
-    expired"). The collector's urllib calls go through this opener, which trusts the certifi
-    bundle shipped in the .exe; certificate verification stays on."""
     try:
         import certifi
         context = ssl.create_default_context(cafile=certifi.where())
@@ -58,7 +42,7 @@ def use_bundled_certificates():
     return context
 
 
-# --- Locations -------------------------------------------------------------------------------
+# Diz se está rodando como administrador
 def is_admin():
     try:
         return bool(ctypes.windll.shell32.IsUserAnAdmin())
@@ -66,28 +50,26 @@ def is_admin():
         return False
 
 
+# Pasta de dados da instalação
 def scope_dir(scope):
     base = os.environ['ProgramData'] if scope == 'maquina' else os.environ['LOCALAPPDATA']
     return Path(base) / APP
 
 
-# A program started from a terminal inside an MSIX-packaged app (e.g. the Claude desktop app)
-# inherits that package: its writes to %LOCALAPPDATA% are silently redirected to
-# %LOCALAPPDATA%/Packages/<family>/LocalCache/Local. Task Scheduler runs outside the package, so
-# a task pointing at the path the installer *saw* fails with 0x80070002 (file not found).
+# Diz se foi aberto de dentro de um app empacotado
 def packaged():
     length = ctypes.c_uint(0)
     try:
-        return ctypes.windll.kernel32.GetCurrentPackageFullName(ctypes.byref(length), None) == 122  # buffer too small
+        return ctypes.windll.kernel32.GetCurrentPackageFullName(ctypes.byref(length), None) == 122
     except (AttributeError, OSError):
         return False
 
 
+# Caminho real de uma pasta no disco
 def physical(path):
-    """The real on-disk path of an existing folder, resolving package redirection."""
     k = ctypes.windll.kernel32
     k.CreateFileW.restype = ctypes.c_void_p
-    handle = k.CreateFileW(str(path), 0, 7, None, 3, 0x02000000, None)  # OPEN_EXISTING, BACKUP_SEMANTICS (folders)
+    handle = k.CreateFileW(str(path), 0, 7, None, 3, 0x02000000, None)
     if handle in (None, ctypes.c_void_p(-1).value):
         return Path(path)
     try:
@@ -100,21 +82,22 @@ def physical(path):
     return Path(strip_long_prefix(buf.value))
 
 
+# Remove o prefixo \\?\ do caminho
 def strip_long_prefix(final):
-    """GetFinalPathNameByHandle returns \\\\?\\C:\\... or \\\\?\\UNC\\server\\share\\..."""
     for prefix, replacement in ((r'\\?\UNC' + '\\', r'\\'), (r'\\?' + '\\', '')):
         if final.startswith(prefix):
             return replacement + final[len(prefix):]
     return final
 
 
+# Caminho virtualizado de uma pasta
 def virtualized(path):
     parts = [x.lower() for x in Path(path).parts]
     return 'packages' in parts and 'localcache' in parts
 
 
+# Instalações feitas por terminal empacotado
 def virtualized_copies():
-    """User installs made from a packaged terminal, seen from outside the package."""
     root = Path(os.environ['LOCALAPPDATA']) / 'Packages'
     try:
         return sorted(d for d in root.glob(f'*/LocalCache/Local/{APP}') if (d / 'config.json').exists())
@@ -122,23 +105,25 @@ def virtualized_copies():
         return []
 
 
+# Procura uma instalação existente
 def installed():
-    """(scope, directory) of an existing installation, machine-wide first."""
     for scope in ('maquina', 'usuario'):
         d = scope_dir(scope)
         try:
             if (d / 'config.json').exists():
                 return scope, d
-        except PermissionError:  # machine install opened without elevation: the folder is restricted
+        except PermissionError:
             return scope, d
     copies = virtualized_copies()
     return ('usuario', copies[0]) if copies else (None, None)
 
 
+# Lê a configuração salva
 def read_config(d):
     return json.loads((d / 'config.json').read_text(encoding='utf-8'))
 
 
+# Executa um comando do Windows
 def run(args, check=True):
     out = subprocess.run(args, capture_output=True, text=True, creationflags=NO_WINDOW)
     if check and out.returncode:
@@ -146,23 +131,22 @@ def run(args, check=True):
     return out
 
 
+# Identificador do usuário atual
 def current_user_sid():
     out = run(['whoami', '/user', '/fo', 'csv', '/nh']).stdout.strip()
     return out.rsplit(',', 1)[1].strip('"')
 
 
+# Restringe o acesso à pasta da credencial
 def restrict(d, scope):
-    """Only SYSTEM, Administrators and (user install) the current user can read the folder."""
     grants = [f'*{SYSTEM_SID}:(OI)(CI)F', f'*{ADMINS_SID}:(OI)(CI)F']
     if scope == 'usuario':
         grants.append(f'*{current_user_sid()}:(OI)(CI)F')
-    # External tools may run outside an app package: always hand them the physical path.
     run(['icacls', str(physical(d)), '/inheritance:r', *sum((['/grant:r', g] for g in grants), [])])
 
 
-# --- Connection test -------------------------------------------------------------------------
+# Testa a conexão com a API
 def test_connection(url, token, api_factory=core.Api, now=lambda: datetime.now(timezone.utc)):
-    """Returns (ok, message, devices). Messages are for non-technical users."""
     token = token.strip()
     if not token.startswith('ehc_'):
         return False, 'A credencial começa com "ehc_". Copie-a da tela Coletores do site.', 0
@@ -188,9 +172,8 @@ def test_connection(url, token, api_factory=core.Api, now=lambda: datetime.now(t
     return True, f'Conectado — {n} dispositivo{"" if n == 1 else "s"}', n
 
 
-# --- Scheduled task --------------------------------------------------------------------------
+# Monta a tarefa agendada do Windows
 def task_xml(scope, command, arguments, user_sid=None):
-    """Hidden task, restarted every minute on failure, no time limit, also on battery."""
     if scope == 'maquina':
         trigger = '<BootTrigger><Enabled>true</Enabled><Delay>PT30S</Delay></BootTrigger>'
         principal = f'<Principal id="Author"><UserId>{SYSTEM_SID}</UserId><RunLevel>HighestAvailable</RunLevel></Principal>'
@@ -221,40 +204,41 @@ def task_xml(scope, command, arguments, user_sid=None):
 '''
 
 
+# Comando que a tarefa executa
 def service_command(d):
     if getattr(sys, 'frozen', False):
         return str(d / EXE), f'--servico --dados "{d}"'
     return sys.executable, f'"{Path(__file__).resolve()}" --servico --dados "{d}"'
 
 
+# Registra a tarefa no Agendador
 def register_task(scope, d):
-    command, arguments = service_command(physical(d))  # the path Task Scheduler will actually find
+    command, arguments = service_command(physical(d))
     xml = task_xml(scope, command, arguments, None if scope == 'maquina' else current_user_sid())
     with tempfile.NamedTemporaryFile('w', suffix='.xml', delete=False, encoding='utf-16') as f:
         f.write(xml)
     try:
-        run(['schtasks', '/Create', '/TN', TASK, '/XML', str(physical(f.name)), '/F'])  # %TEMP% may be redirected too
+        run(['schtasks', '/Create', '/TN', TASK, '/XML', str(physical(f.name)), '/F'])
     finally:
         os.unlink(f.name)
 
 
+# Situação da tarefa agendada
 def task_state():
     out = run(['schtasks', '/Query', '/TN', TASK, '/FO', 'CSV', '/NH'], check=False)
     if out.returncode:
         return None
-    # "TaskName","Next Run Time","Status" — the status text follows the Windows language.
     return out.stdout.strip().rsplit(',', 1)[-1].strip('"')
 
 
+# Inicia o coletor instalado
 def start():
     run(['schtasks', '/Change', '/TN', TASK, '/ENABLE'], check=False)
     run(['schtasks', '/Run', '/TN', TASK])
 
 
+# Encerra o coletor em execução
 def end_service():
-    """Ends the running collector. schtasks /End alone is not enough: the single-file .exe runs
-    as a launcher plus a child process, and the child would keep running. The service records
-    the child's PID; the setup window (same image name) is never touched."""
     run(['schtasks', '/End', '/TN', TASK], check=False)
     _, d = installed()
     pid_file = d / 'coletor.pid' if d else None
@@ -265,12 +249,13 @@ def end_service():
         pid_file.unlink(missing_ok=True)
 
 
+# Para o coletor instalado
 def stop():
-    run(['schtasks', '/Change', '/TN', TASK, '/DISABLE'], check=False)  # first, or the task would restart it
+    run(['schtasks', '/Change', '/TN', TASK, '/DISABLE'], check=False)
     end_service()
 
 
-# --- Install / uninstall ---------------------------------------------------------------------
+# Instala o coletor
 def install(url, token, scope):
     d = scope_dir(scope)
     (d / 'logs').mkdir(parents=True, exist_ok=True)
@@ -281,9 +266,9 @@ def install(url, token, scope):
                                               indent=2), encoding='utf-8')
     if getattr(sys, 'frozen', False) and Path(sys.executable).resolve() != (d / EXE).resolve():
         stop_running_copy()
-        for attempt in range(10):  # the previous service process may take a moment to exit
+        for attempt in range(10):
             try:
-                shutil.copy2(sys.executable, d / EXE)  # the downloaded file can be deleted afterwards
+                shutil.copy2(sys.executable, d / EXE)
                 break
             except PermissionError:
                 if attempt == 9:
@@ -294,22 +279,20 @@ def install(url, token, scope):
     return physical(d)
 
 
+# Repara a instalação mantendo credencial e fila
 def repair():
-    """Re-registers the task of the existing installation, keeping credential, queue and logs.
-    Run outside a packaged terminal, an installation that was redirected into an app's
-    LocalCache is first moved to the real %LOCALAPPDATA%, so it no longer depends on that app."""
     scope, d = installed()
     if not d:
         raise RuntimeError('Nenhuma instalação do coletor encontrada.')
     source = physical(d)
-    end_service()  # also the copy started by hand: it records its PID in the same folder
+    end_service()
     target = source
     if scope == 'usuario' and virtualized(source) and not packaged():
         target = scope_dir('usuario')
         shutil.copytree(source, target, dirs_exist_ok=True, ignore=shutil.ignore_patterns('coletor.pid', EXE))
         restrict(target, 'usuario')
     if getattr(sys, 'frozen', False) and Path(sys.executable).resolve() != (target / EXE).resolve():
-        for attempt in range(10):  # this (fixed) build replaces the installed copy
+        for attempt in range(10):
             try:
                 shutil.copy2(sys.executable, target / EXE)
                 break
@@ -330,44 +313,45 @@ def repair():
     return physical(target)
 
 
+# Para a cópia em execução
 def stop_running_copy():
     end_service()
 
 
+# Desinstala o coletor
 def uninstall():
     scope, d = installed()
     run(['schtasks', '/Change', '/TN', TASK, '/DISABLE'], check=False)
     end_service()
     run(['schtasks', '/Delete', '/TN', TASK, '/F'], check=False)
-    time.sleep(1)  # let the ended service process release its files
+    time.sleep(1)
     if not d:
         return None
     own_copy = getattr(sys, 'frozen', False) and Path(sys.executable).resolve().parent == d.resolve()
-    for _ in range(0 if own_copy else 5):  # an ended process can keep its .exe locked for a moment
+    for _ in range(0 if own_copy else 5):
         shutil.rmtree(d, ignore_errors=True)
         if not d.exists():
             break
         time.sleep(1)
     if d.exists():
-        # Still locked (or this very .exe lives there): remove it right after this process exits.
         subprocess.Popen(f'cmd /c ping -n 4 127.0.0.1 >nul & rmdir /s /q "{d}"', creationflags=NO_WINDOW, shell=True)
     return d
 
 
-# --- Service mode ----------------------------------------------------------------------------
+# Nome único de cada instalação
 def instance_name(scope, d):
-    """One collector per installation: the lock is named after the physical data folder, so a copy
-    started by hand from a packaged terminal and the scheduled task still exclude each other."""
     digest = hashlib.sha256(os.path.normcase(str(physical(d))).encode()).hexdigest()[:16]
     return ('Global\\' if scope == 'maquina' else 'Local\\') + 'EdgeHealthColetor-' + digest
 
 
+# Garante um único coletor por instalação
 def single_instance(scope, d):
     name = instance_name(scope, d)
     handle = ctypes.windll.kernel32.CreateMutexW(None, False, name)
-    return handle if ctypes.windll.kernel32.GetLastError() != 183 else None  # 183: already exists
+    return handle if ctypes.windll.kernel32.GetLastError() != 183 else None
 
 
+# Modo serviço: roda o laço do coletor
 def service(d):
     d = Path(d)
     cfg = read_config(d)
@@ -383,27 +367,26 @@ def service(d):
     try:
         collector.run()
     except core.AuthError as error:
-        # Exit code != 0: the task restarts every minute, so a new credential is picked up.
         log.error('%s Gere uma nova credencial na tela Coletores e reconfigure o coletor.', error)
         return 2
     return 0
 
 
-# --- Windows ---------------------------------------------------------------------------------
+# Reabre o programa como administrador
 def relaunch_as_admin():
     params = ' '.join(f'"{a}"' for a in sys.argv[1:])
     exe, args = (sys.executable, params) if getattr(sys, 'frozen', False) else (sys.executable, f'"{Path(__file__).resolve()}" {params}')
     return ctypes.windll.shell32.ShellExecuteW(None, 'runas', exe, args, None, 1) > 32
 
 
-def gui():  # pragma: no cover - interactive
+# Janela de instalação
+def gui():
     import threading
     import tkinter as tk
     from tkinter import messagebox, ttk
 
     root = tk.Tk()
     root.title('Coletor EdgeHealth')
-    # Icon bundled by build.ps1 (--add-data); in development it is read from collector/build.
     icon = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parents[1] / 'build')) / 'icone.ico'
     if icon.exists():
         root.iconbitmap(default=str(icon))
@@ -417,9 +400,11 @@ def gui():  # pragma: no cover - interactive
     ttk.Label(frame, text='Coletor EdgeHealth', style='Title.TLabel').grid(row=0, column=0, columnspan=2, sticky='w')
     status = ttk.Label(frame, text='', wraplength=430, justify='left')
 
+    # Mostra uma mensagem na janela
     def show(text, ok=None):
         status.configure(text=text, style='Ok.TLabel' if ok else 'Err.TLabel' if ok is False else 'TLabel')
 
+    # Desativa o botão enquanto trabalha
     def busy(button, text):
         button.state(['disabled']); show(text); root.update_idletasks()
 
@@ -439,17 +424,21 @@ def gui():  # pragma: no cover - interactive
         state = ttk.Label(frame, text='')
         state.grid(row=2, column=0, columnspan=2, sticky='w')
 
+        # Atualiza a situação na janela
         def refresh():
             s = task_state()
             state.configure(text=f'Situação da tarefa: {s or "não registrada"}')
 
+        # Botão Testar conexão
         def check():
             busy(buttons[0], 'Testando a conexão…')
+            # Testa a conexão em segundo plano
             def work():
                 ok, msg, _ = test_connection(cfg['api_url'], (d / 'coletor.token').read_text(encoding='ascii'))
                 root.after(0, lambda: (show(msg, ok), buttons[0].state(['!disabled'])))
             threading.Thread(target=work, daemon=True).start()
 
+        # Executa uma ação e mostra o resultado
         def do(action, done):
             try:
                 action(); show(done, True)
@@ -457,6 +446,7 @@ def gui():  # pragma: no cover - interactive
                 show(str(e), False)
             refresh()
 
+        # Botão Desinstalar
         def remove():
             if messagebox.askyesno('Desinstalar', 'Remover o coletor, a tarefa agendada e os dados locais (credencial, fila e logs)?'):
                 do(uninstall, 'Coletor desinstalado. Você pode apagar o arquivo baixado.')
@@ -488,9 +478,11 @@ def gui():  # pragma: no cover - interactive
         status.grid(row=8, column=0, columnspan=2, sticky='w', pady=(10, 0))
         row = ttk.Frame(frame); row.grid(row=7, column=0, columnspan=2, sticky='w')
 
+        # Botão Instalar
         def connect():
             busy(go, 'Conectando…')
             u, t = url.get(), token.get()
+            # Instala em segundo plano
             def work():
                 ok, msg, _ = test_connection(u, t)
                 if ok:
@@ -511,13 +503,14 @@ def gui():  # pragma: no cover - interactive
     root.mainloop()
 
 
+# Liga o terminal para mostrar mensagens
 def attach_console():
-    """The .exe has no console window; command-line modes print to the calling terminal."""
     if getattr(sys, 'frozen', False) and ctypes.windll.kernel32.AttachConsole(-1):
         sys.stdout = open('CONOUT$', 'w', encoding='utf-8', errors='replace')
         sys.stderr = sys.stdout
 
 
+# Início: abre a janela ou executa a opção
 def main(argv=None):
     use_bundled_certificates()
     p = argparse.ArgumentParser(description='Coletor EdgeHealth para Windows')
@@ -530,8 +523,8 @@ def main(argv=None):
     p.add_argument('--iniciar', action='store_true')
     p.add_argument('--desinstalar', action='store_true')
     p.add_argument('--reparar', action='store_true', help='re-registra a tarefa da instalação existente, sem trocar a credencial')
-    p.add_argument('--pasta', help=argparse.SUPPRESS)        # test isolation: data folder name
-    p.add_argument('--nome-tarefa', help=argparse.SUPPRESS)  # test isolation: scheduled task name
+    p.add_argument('--pasta', help=argparse.SUPPRESS)
+    p.add_argument('--nome-tarefa', help=argparse.SUPPRESS)
     args = p.parse_args(argv)
     global APP, TASK
     APP, TASK = args.pasta or APP, args.nome_tarefa or TASK

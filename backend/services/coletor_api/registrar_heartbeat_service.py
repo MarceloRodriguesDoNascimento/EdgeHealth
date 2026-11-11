@@ -1,3 +1,4 @@
+# Caso de uso: receber o sinal de vida do coletor
 from app import validation as v
 from models import iso, utcnow
 from repositories import Transacao
@@ -5,9 +6,9 @@ from services.coletores.estado_coletor import EstadoColetor
 from .registrar_erro_coletor_service import RegistrarErroColetorService
 
 
+# Registro de heartbeat
 class RegistrarHeartbeatService:
-    """Version, pending queue and last error reported by the collector."""
-
+    # Atualiza versão, fila e último contato
     def executar(self, coletor, dados):
         if 'versao' in dados:
             coletor.versao = v.string(dados['versao'], 'Versão', 30)

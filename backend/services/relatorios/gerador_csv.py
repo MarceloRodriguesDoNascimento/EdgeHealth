@@ -1,11 +1,12 @@
+# Gera CSV que abre certo no Excel
 import csv
 import io
 import json
 
 
+# Geração de CSV
 class GeradorCsv:
-    """CSV for spreadsheets: ';' separator, UTF-8 with BOM and no formula injection."""
-
+    # Monta o CSV com as linhas e colunas
     @staticmethod
     def gerar(linhas, campos):
         out = io.StringIO(newline='')
@@ -18,7 +19,7 @@ class GeradorCsv:
                 if isinstance(value, (dict, list)): value = json.dumps(value, ensure_ascii=False)
                 if value is None: value = ''
                 if isinstance(value, str) and value.lstrip().startswith(('=', '+', '-', '@')):
-                    value = "'" + value  # Prevent spreadsheet formula injection on export.
+                    value = "'" + value
                 values.append(value)
             writer.writerow(values)
         return ('﻿' + out.getvalue()).encode('utf-8')

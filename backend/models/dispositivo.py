@@ -1,13 +1,14 @@
+# Model dos dispositivos monitorados
 from sqlalchemy import CheckConstraint, Index, text
 from app.extensions import db
 from .base import BaseModel, DecimalText, utcnow
 
 
+# Tabela dispositivos
 class Dispositivo(BaseModel):
     __tablename__ = 'dispositivos'
     id = db.Column(db.Integer, primary_key=True)
     empresa_id = db.Column(db.Integer, db.ForeignKey('empresas.id', ondelete='RESTRICT'), nullable=False, index=True)
-    # NULL: measured by the local worker. Otherwise only this remote collector may measure it.
     coletor_id = db.Column(db.Integer, db.ForeignKey('coletores.id'), index=True)
     nome = db.Column(db.String(100), nullable=False)
     ip = db.Column(db.String(45), nullable=False)
@@ -25,7 +26,6 @@ class Dispositivo(BaseModel):
     lease_owner = db.Column(db.String(64))
     lease_until = db.Column(db.DateTime)
     proxima_coleta = db.Column(db.DateTime, nullable=False, default=utcnow, index=True)
-    # Business impact (services/custos). NULL: fall back to the default for the device type.
     usuarios_dependentes = db.Column(db.Integer)
     perda_produtividade_pct = db.Column(db.Integer)
     receita_hora_dependente = db.Column(DecimalText())
@@ -38,12 +38,12 @@ class Dispositivo(BaseModel):
               sqlite_where=text('arquivado_em IS NULL'), postgresql_where=text('arquivado_em IS NULL')),
     )
 
+    # Diz se o dispositivo está sendo medido agora
     def em_coleta(self, agora):
-        """A worker or collector request holds the exclusive lease of this device."""
         return bool(self.lease_until and self.lease_until > agora)
 
+    # Zera o estado atual do dispositivo
     def reiniciar_estado(self):
-        """The current state restarts from a fresh measurement; the history is preserved."""
         self.status = None
         self.ultima_coleta = None
         self.latencia_ms = self.perda_pacotes_pct = None

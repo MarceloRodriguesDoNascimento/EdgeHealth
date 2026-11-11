@@ -1,3 +1,4 @@
+# Testes da importação legada e das migrations
 import hashlib
 import json
 import sqlite3
@@ -17,9 +18,9 @@ def test_fresh_migrations_and_model_consistency(tmp_path):
     migrations = str(Path(__file__).resolve().parents[1] / 'migrations')
     with app.app_context():
         upgrade(directory=migrations)
-        upgrade(directory=migrations)  # A second deployment is idempotent.
+        upgrade(directory=migrations)
         check(directory=migrations)
-        downgrade(directory=migrations, revision='7c7ba005affc')  # Empty database: reversible.
+        downgrade(directory=migrations, revision='7c7ba005affc')
         upgrade(directory=migrations)
         check(directory=migrations)
         assert db.session.execute(text('PRAGMA foreign_keys')).scalar() == 1
@@ -34,7 +35,6 @@ def test_fresh_migrations_and_model_consistency(tmp_path):
 
 
 def test_upgrade_from_previous_release_preserves_history(tmp_path):
-    """A database at 7c7ba005affc (first published MVP) upgrades in place without losing rows."""
     app = create_app({'TESTING': True, 'SQLALCHEMY_DATABASE_URI': 'sqlite:///' + str(tmp_path / 'old.db')})
     migrations = str(Path(__file__).resolve().parents[1] / 'migrations')
     with app.app_context():
@@ -55,7 +55,7 @@ def test_upgrade_from_previous_release_preserves_history(tmp_path):
         assert metric.coletor_id is None and metric.fora_de_ordem is False and metric.status == 'OFFLINE'
         assert db.session.get(Dispositivo, 1).coletor_id is None
         assert db.session.get(Falha, 1).estado == 'ABERTA'
-        assert db.session.get(Usuario, 1).termos_versao is None  # must accept the terms at next login
+        assert db.session.get(Usuario, 1).termos_versao is None
 
 
 def test_legacy_preserved_without_fabricated_measurements_or_plaintext_passwords(app, tmp_path):

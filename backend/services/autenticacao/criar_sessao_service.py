@@ -1,3 +1,4 @@
+# Caso de uso: abrir uma sessão de login
 import secrets
 from dataclasses import dataclass
 from datetime import timedelta
@@ -7,17 +8,17 @@ from repositories import AutenticacaoRepository, Transacao
 from services.comum.hash_token import HashToken
 
 
+# Resultado: resposta e tokens para os cookies
 @dataclass(frozen=True)
 class SessaoIniciada:
-    """Response body of a successful login/registration and the credentials for the cookies."""
     corpo: dict
     token: str
     csrf: str
 
 
+# Cria a sessão do usuário
 class CriarSessaoService:
-    """Opens a session for the user (only hashes are stored) and confirms the transaction."""
-
+    # Gera os tokens e grava a sessão
     def executar(self, usuario):
         token = secrets.token_urlsafe(32)
         csrf = secrets.token_urlsafe(32)

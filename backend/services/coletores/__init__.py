@@ -1,1 +1,2 @@
-"""Administration of remote collectors (company admin) and their credential."""
+# Services de administração dos coletores
+pass

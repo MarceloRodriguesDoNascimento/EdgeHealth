@@ -1,18 +1,21 @@
+# Resultado de uma medição (ping)
 from dataclasses import dataclass
 from math import isfinite
 
 
+# Erro: a medição não foi confiável
 class CollectorError(Exception):
-    """The collector could not execute a trustworthy measurement."""
+    pass
 
 
+# Pacotes enviados, recebidos e latência
 @dataclass(frozen=True)
 class ProbeResult:
-    """One measurement: packets sent/received and the average latency (unknown without replies)."""
     sent: int
     received: int
     latency_ms: float | None
 
+    # Valida os números da medição
     def __post_init__(self):
         if isinstance(self.sent, bool) or not isinstance(self.sent, int) or self.sent <= 0:
             raise CollectorError('Quantidade de pacotes enviados inválida.')
@@ -23,6 +26,7 @@ class ProbeResult:
         if not self.received and self.latency_ms is not None:
             raise CollectorError('Sem resposta, a latência deve permanecer desconhecida.')
 
+    # Percentual de perda de pacotes
     @property
     def loss(self):
         return (self.sent - self.received) * 100.0 / self.sent

@@ -1,11 +1,12 @@
+# Valida e aplica os campos do formulário de usuário
 from werkzeug.exceptions import BadRequest, Conflict
 from werkzeug.security import generate_password_hash
 from app import validation as v
 
 
+# Campos do usuário
 class DadosUsuario:
-    """Validates and applies the fields of the user form (shared by create and update)."""
-
+    # Valida e copia os campos para o usuário
     @staticmethod
     def aplicar(usuario, dados, id, solicitante_id):
         if 'nome' in dados: usuario.nome = v.string(dados['nome'], 'Nome', 100)

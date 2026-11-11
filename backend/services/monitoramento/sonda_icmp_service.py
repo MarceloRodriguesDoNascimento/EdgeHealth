@@ -1,12 +1,13 @@
+# Faz o ping (ICMP) num endereço IP
 import ipaddress
 from icmplib import ping
 from icmplib.exceptions import ICMPLibError
 from .resultado_sonda import CollectorError, ProbeResult
 
 
+# Ping ICMP
 class SondaIcmpService:
-    """External integration: bounded, unprivileged ICMP echo through icmplib."""
-
+    # Envia os pacotes e devolve o resultado
     def executar(self, endereco, quantidade=4, timeout=1):
         try:
             parsed = ipaddress.ip_address(endereco)

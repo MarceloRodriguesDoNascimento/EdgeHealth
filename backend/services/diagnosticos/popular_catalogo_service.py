@@ -1,10 +1,10 @@
+# Caso de uso: cadastrar as recomendações que faltam
 from models import Recomendacao
 from repositories import DiagnosticoRepository, Transacao
 
 
+# Carga do catálogo
 class PopularCatalogoService:
-    """Creates the missing corrective-action catalog entries (never fabricated network observations)."""
-
     CATALOGO = [
         ('LOCALIZADA', 'local-cabo', 'Verificar conexão e alimentação', 'Verifique alimentação, cabo e porta do dispositivo. Compare com um equipamento que esteja respondendo.'),
         ('LOCALIZADA', 'local-config', 'Validar configuração', 'Confira IP, máscara e políticas de resposta ICMP do equipamento antes de concluir que há defeito físico.'),
@@ -16,6 +16,7 @@ class PopularCatalogoService:
         ('RECORRENTE', 'recurring-check', 'Investigar recorrência', 'Compare horários das ocorrências anteriores, conexões físicas e mudanças de configuração.'),
     ]
 
+    # Cria as recomendações ausentes
     def executar(self):
         existing = DiagnosticoRepository.codigos_do_catalogo()
         for rule, code, title, action in self.CATALOGO:

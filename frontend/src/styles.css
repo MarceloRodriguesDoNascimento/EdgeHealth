@@ -1,5 +1,4 @@
-/* EdgeHealth: the front panel of a network switch. Patch-cable blue for structure, LED colors only for status,
-   one type family whose width carries the hierarchy (condensed numbers and titles, normal text). */
+/* Estilo visual do site */
 :root{
   --sans:"Archivo Variable",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
   --mono:ui-monospace,SFMono-Regular,Consolas,monospace;
@@ -38,7 +37,6 @@ input.mono{font-size:1rem}
 .skip-link{position:absolute;left:12px;top:-60px;z-index:1100;background:var(--surface);color:var(--ink);border:2px solid var(--ink);border-radius:5px;padding:10px 14px}
 .skip-link:focus{top:8px}
 
-/* Chassis: the navigation band, with the active tab joined to the page below it */
 .brand{display:flex;align-items:center;gap:10px;min-height:44px;text-decoration:none;font-size:1.3rem;font-stretch:85%;letter-spacing:-.01em;font-weight:700}
 .brand-logo{display:block;width:32px;height:32px;border-radius:7px;flex:none}
 .sidebar{background:var(--cable);color:var(--on-cable);padding:0 32px;display:flex;align-items:flex-end;gap:36px;min-height:60px}
@@ -65,7 +63,6 @@ input.mono{font-size:1rem}
 .app-footer a,.legal-links a{color:inherit}
 .legal-links{margin-top:18px}
 
-/* Headings and actions */
 .page-heading{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;margin-bottom:22px}
 .page-heading p{margin:0}
 .page-heading .actions{flex-wrap:wrap;justify-content:flex-end}
@@ -93,7 +90,6 @@ input.mono{font-size:1rem}
 details{margin-top:20px}
 summary{cursor:pointer;font-weight:550;color:var(--cable)}
 
-/* The front panel: the one bold thing. One port per device, lit by its real status. */
 .faceplate{background:var(--cable);color:#fff;border-radius:8px;padding:24px 26px 20px;margin-bottom:24px}
 .faceplate h2{font-size:clamp(1.5rem,2.6vw,2.2rem);line-height:1.12;font-stretch:80%;font-weight:700;letter-spacing:-.01em;margin-bottom:18px;color:#fff}
 .faceplate p{color:var(--on-cable);font-size:.875rem;margin:12px 0 0}
@@ -104,7 +100,7 @@ summary{cursor:pointer;font-weight:550;color:var(--cable)}
 .port.ONLINE{--led:#3ddc84}
 .port.INSTAVEL{--led:#ffc233}
 .port.OFFLINE{--led:#ff5a4f}
-/* Status never depends on color alone: online round, unstable diamond, offline square, no data hollow. */
+
 .port.INSTAVEL::before,.stat.warn>span::before{border-radius:1px;transform:rotate(45deg)}
 .port.OFFLINE::before,.stat.bad>span::before{border-radius:1px}
 .port.SEM_COLETA::before{background:transparent;box-shadow:inset 0 0 0 2px #ffffff66}
@@ -114,7 +110,6 @@ button.port:focus-visible{outline:2px solid #fff;outline-offset:1px}
 .port.OFFLINE::before{animation:alarm 1.6s steps(2,jump-none) infinite}
 @keyframes alarm{from{opacity:1}to{opacity:.3}}
 
-/* Indicators: the legend of the panel, set as numbers rather than cards */
 .stats-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0 24px;margin-bottom:8px}
 .stat{padding:10px 0 0;border-top:2px solid var(--ink);display:grid;gap:2px;--signal:var(--led-idle)}
 .stat>span{display:flex;align-items:center;gap:7px;font-size:.875rem;color:var(--muted)}
@@ -138,7 +133,6 @@ button.port:focus-visible{outline:2px solid #fff;outline-offset:1px}
 .severity-row strong{font-variant-numeric:tabular-nums}
 .severity-list+.muted{margin:10px 0 0}
 
-/* Forms */
 .filters{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin-bottom:12px}
 .filters .field{min-width:140px;flex:1}
 .filters .button{flex-shrink:0;min-height:44px}
@@ -172,7 +166,6 @@ button.port:focus-visible{outline:2px solid #fff;outline-offset:1px}
 .day-picker>legend{width:100%}
 .cost-preview{margin:0;padding:12px 14px;background:#e8edfb;border-radius:5px;font-weight:550;color:var(--cable-deep);overflow-wrap:anywhere}
 
-/* Tables and status */
 .table-wrap{overflow-x:auto;max-width:100%;background:var(--surface);border:1px solid var(--line);border-radius:8px}
 table{width:100%;border-collapse:collapse;text-align:left;font-size:.9rem}
 th{padding:11px 16px;color:var(--muted);font-size:.82rem;font-weight:550;white-space:nowrap;border-bottom:1px solid var(--line)}
@@ -192,7 +185,6 @@ td.cell-actions .actions.compact{display:grid;grid-template-columns:repeat(2,max
 .loading{padding:56px;text-align:center;color:var(--muted)}
 .pagination{display:flex;justify-content:space-between;align-items:center;gap:20px;margin:18px 0;font-size:.875rem}
 
-/* Incident: the same panel as the network view, reduced to one port, then the reading order what, why, what to do */
 .incident-head{padding:20px 24px}
 .incident-title{display:flex;align-items:center;gap:16px;margin-bottom:18px}
 .incident-title .ports{min-height:0;padding:6px;flex:none}
@@ -240,7 +232,6 @@ td.cell-actions .actions.compact{display:grid;grid-template-columns:repeat(2,max
 .panel>.section-heading:first-child{margin-top:0}
 .ai-panel .section-heading{flex-wrap:wrap}
 
-/* Dialogs and notifications */
 .modal{border:1px solid var(--line);border-radius:8px;padding:26px;width:min(880px,calc(100vw - 32px));max-width:calc(100vw - 24px);max-height:calc(100dvh - 32px);overflow:auto;overscroll-behavior:contain;color:inherit;box-shadow:0 18px 50px #0a1a5240}
 .modal::backdrop{background:#0a1a5266}
 .modal-heading{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:18px}
@@ -250,7 +241,6 @@ td.cell-actions .actions.compact{display:grid;grid-template-columns:repeat(2,max
 .toast{background:var(--socket);color:#fff;padding:13px 18px;border-radius:5px;box-shadow:0 8px 24px #0a1a5233;font-size:.92rem}
 .toast.error{background:var(--bad)}
 
-/* Sign-in: a panel powering on, port by port. The single orchestrated motion of the product. */
 .auth-layout{min-height:100vh;display:grid;grid-template-columns:1.15fr 1fr;background:var(--surface)}
 .auth-intro{background:var(--cable);color:#fff;padding:34px clamp(32px,6vw,84px);display:flex;flex-direction:column;justify-content:center;gap:44px;position:relative}
 .auth-intro>.brand{position:absolute;top:30px;left:clamp(32px,6vw,84px)}
@@ -304,7 +294,7 @@ td.cell-actions .actions.compact{display:grid;grid-template-columns:repeat(2,max
   .page-heading{flex-wrap:wrap}
   .page-heading .actions{justify-content:flex-start}
   .button{min-height:44px}
-  /* Tables become cards; data-label carries the column name. */
+
   .table-wrap{overflow:visible;border:0;background:transparent;border-radius:0}
   .table-wrap table,.table-wrap tbody,.table-wrap tr,.table-wrap td{display:block;width:100%}
   .table-wrap thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
@@ -347,7 +337,7 @@ td.cell-actions .actions.compact{display:grid;grid-template-columns:repeat(2,max
   .modal .actions.end .button{flex:1 1 auto}
   .chart-box{height:210px}
 }
-/* Touch devices: every target at least 44 px. */
+
 @media(pointer:coarse){
   .button,.text-link,summary{min-height:44px}
   .text-link,summary{display:inline-flex;align-items:center}

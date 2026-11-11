@@ -1,12 +1,13 @@
+# Caso de uso: recuperar uma conta pelo terminal
 from werkzeug.security import generate_password_hash
 from app import validation as v
 from models import Usuario
 from repositories import AutenticacaoRepository
 
 
+# Ativação de usuário
 class AtivarUsuarioService:
-    """Local operator recovery for an existing account (CLI); never creates a tenant."""
-
+    # Define nova senha e reativa a conta
     def executar(self, email, senha, admin=False):
         user = Usuario.buscar_um_por(email=email.strip().lower())
         if not user:

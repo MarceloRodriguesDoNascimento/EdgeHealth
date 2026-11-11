@@ -1,6 +1,4 @@
-"""The only class that talks to the Gemini API (Google). REST generateContent with urllib: no extra
-dependency. The key comes from GEMINI_API_KEY (.env) and travels in a header, never in the URL,
-a log or an error message."""
+# Única classe que conversa com a API do Gemini
 import json
 import logging
 import socket
@@ -13,13 +11,14 @@ log = logging.getLogger(__name__)
 URL = 'https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent'
 
 
+# Status e corpo de uma resposta HTTP
 class RespostaHttp:
-    """Status and body returned by a transport (also used by the tests' fake transport)."""
-
+    # Guarda status e corpo
     def __init__(self, status, corpo):
         self.status, self.corpo = status, corpo
 
 
+# Faz a chamada HTTP ao Gemini
 def transporte_urllib(url, cabecalhos, corpo, timeout):
     request = urllib.request.Request(url, data=corpo, headers=cabecalhos, method='POST')
     try:
@@ -29,18 +28,21 @@ def transporte_urllib(url, cabecalhos, corpo, timeout):
         return RespostaHttp(error.code, error.read())
 
 
+# Cliente do Gemini
 class GeminiService:
     SEM_CHAVE = 'IA não configurada neste servidor.'
 
+    # Recebe o transporte HTTP
     def __init__(self, transporte=None):
         self.transporte = transporte or transporte_urllib
 
+    # Diz se a chave da IA está configurada
     @staticmethod
     def disponivel():
         return bool(current_app.config.get('GEMINI_API_KEY'))
 
+    # Envia o pedido e devolve o texto gerado
     def executar(self, instrucao, prompt, max_tokens=2048):
-        """Generated text; 503 when unavailable (no key, quota, network), 502 for an unusable answer."""
         cfg = current_app.config
         if not self.disponivel():
             raise ServiceUnavailable(self.SEM_CHAVE)
@@ -58,6 +60,7 @@ class GeminiService:
             raise ServiceUnavailable('Não foi possível conectar ao serviço de IA. Tente novamente mais tarde.') from None
         return self._texto(resposta)
 
+    # Extrai o texto da resposta ou gera erro claro
     @staticmethod
     def _texto(resposta):
         try:

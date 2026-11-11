@@ -1,13 +1,12 @@
+# Sugere o impacto padrão pelo tipo do dispositivo
 import re
 import unicodedata
 
 TODOS, SETOR = 'TODOS', 'SETOR'
 
 
+# Categorias de dispositivo
 class CategoriaDispositivo:
-    """Default business impact of a device type (pre-filled and editable by the user)."""
-
-    # category, keywords (normalized, whole words), people (int, TODOS or SETOR), loss %, label, hint
     CATEGORIAS = [
         ('PDV', ('ponto de venda', 'pdv', 'maquina de cartao', 'maquininha', 'pos', 'caixa', 'tef'), 1, 100,
          'Ponto de venda / máquina de cartão', 'Informe a receita por hora que passa por este aparelho.'),
@@ -25,16 +24,19 @@ class CategoriaDispositivo:
     ]
     OUTROS = ('OUTROS', (), 1, 50, 'Outros', '')
 
+    # Tira acentos e deixa em minúsculas
     @staticmethod
     def normalizar(texto):
         plain = unicodedata.normalize('NFKD', texto or '').encode('ascii', 'ignore').decode().lower()
         return ' ' + re.sub(r'[^a-z0-9]+', ' ', plain).strip() + ' '
 
+    # Descobre a categoria pelo tipo digitado
     @classmethod
     def identificar(cls, tipo):
         words = cls.normalizar(tipo)
         return next((c for c in cls.CATEGORIAS if any(f' {k} ' in words for k in c[1])), cls.OUTROS)
 
+    # Impacto padrão da categoria
     @classmethod
     def padroes(cls, tipo, empresa):
         code, _, people, loss, label, hint = cls.identificar(tipo)

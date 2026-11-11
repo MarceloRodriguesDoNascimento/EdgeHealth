@@ -1,1 +1,2 @@
-"""Readiness check used by hosting health probes."""
+# Services de verificação de saúde do servidor
+pass

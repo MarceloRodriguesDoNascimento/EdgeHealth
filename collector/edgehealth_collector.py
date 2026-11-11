@@ -1,12 +1,4 @@
-"""EdgeHealth remote collector.
-
-Runs inside the company network, measures the devices assigned to it by the hosted
-EdgeHealth API (ICMP: packets sent/received and latency) and sends the raw samples
-over HTTPS. It never decides status, incidents, severity or diagnosis: the server does.
-
-Only outbound HTTPS is used; no inbound port is opened in the company network.
-Standard library + icmplib only.
-"""
+# Coletor: mede os dispositivos dentro da rede e envia ao servidor
 import argparse
 import json
 import logging
@@ -32,20 +24,25 @@ FINAL = {'ACEITA', 'DUPLICADA', 'ATRASADA', 'REJEITADA'}
 log = logging.getLogger('edgehealth.collector')
 
 
+# Erro: credencial recusada
 class AuthError(Exception):
-    """Credential invalid or revoked: retrying cannot succeed."""
+    pass
 
 
+# Erro: API fora do ar, tentar de novo depois
 class ApiUnavailable(Exception):
-    """Network error, timeout, 429 or 5xx: keep data queued and retry with backoff."""
+    pass
 
 
+# Cliente HTTP da API do EdgeHealth
 class Api:
+    # Guarda endereço, credencial e tempo limite
     def __init__(self, base_url, token, timeout=15):
         self.base = base_url.rstrip('/')
         self.token = token
         self.timeout = timeout
 
+    # Envia a requisição e trata as respostas de erro
     def call(self, method, path, body=None):
         data = json.dumps(body).encode() if body is not None else None
         request = urllib.request.Request(self.base + path, data=data, method=method, headers={
@@ -65,9 +62,9 @@ class Api:
             raise ApiUnavailable(f'Sem conexão com a API: {type(error).__name__}') from None
 
 
+# Fila em disco das amostras ainda não enviadas
 class Queue:
-    """Bounded on-disk queue of samples not yet confirmed by the API."""
-
+    # Abre a fila e carrega o arquivo
     def __init__(self, path, limit):
         self.path = Path(path)
         self.limit = limit
@@ -81,43 +78,49 @@ class Queue:
                     log.warning('Linha inválida ignorada na fila local.')
             self._trim()
 
+    # Descarta as amostras mais antigas se a fila encher
     def _trim(self):
         excess = len(self.items) - self.limit
         if excess > 0:
-            # Oldest samples are discarded first; the API would reject very old samples anyway.
             del self.items[:excess]
             log.warning('Fila local cheia: %s amostras antigas descartadas.', excess)
 
+    # Grava a fila no disco com segurança
     def _save(self):
         tmp = self.path.with_suffix('.tmp')
         tmp.write_text(''.join(json.dumps(i) + '\n' for i in self.items), encoding='utf-8')
         os.replace(tmp, self.path)
 
+    # Adiciona amostras na fila
     def add(self, items):
         with self.lock:
             self.items.extend(items)
             self._trim()
             self._save()
 
+    # Primeiras amostras da fila
     def head(self, size):
         with self.lock:
             return list(self.items[:size])
 
+    # Remove amostras já enviadas
     def remove(self, ids):
         with self.lock:
             self.items = [i for i in self.items if i['id'] not in ids]
             self._save()
 
+    # Tamanho da fila
     def __len__(self):
         return len(self.items)
 
 
+# Data e hora atual em UTC
 def utc_now():
     return datetime.now(timezone.utc)
 
 
+# Mede um dispositivo com ping
 def measure(device, packets, timeout):
-    """Returns (sample, None) or (None, error). A collector failure is never a device failure."""
     observed = utc_now().isoformat(timespec='milliseconds').replace('+00:00', 'Z')
     try:
         host = ping(device['ip'], count=packets, interval=0.2, timeout=timeout, privileged=False)
@@ -130,7 +133,9 @@ def measure(device, packets, timeout):
                 enviados=host.packets_sent, recebidos=host.packets_received, latencia_ms=latency), None
 
 
+# Coordena API, fila e medição
 class Collector:
+    # Guarda API, fila e configurações
     def __init__(self, api, queue, workers=4, measure_fn=measure, clock=time.monotonic):
         self.api = api
         self.queue = queue
@@ -145,20 +150,23 @@ class Collector:
         self.retry_at = 0
         self.stop = threading.Event()
 
-    # --- API side ---------------------------------------------------------------------
+    # Diz se já pode chamar a API de novo
     def api_ready(self):
         return self.clock() >= self.retry_at
 
+    # Espera cada vez mais após falhas da API
     def api_failed(self, error):
         self.backoff = min(300, max(2, self.backoff * 2))
         delay = self.backoff * random.uniform(0.8, 1.2)
         self.retry_at = self.clock() + delay
         log.warning('%s. Nova tentativa em %.0f s; %s amostras na fila local.', error, delay, len(self.queue))
 
+    # Zera a espera após sucesso
     def api_ok(self):
         self.backoff = 0
         self.retry_at = 0
 
+    # Busca a configuração no servidor
     def refresh_config(self):
         refresh = 30 if not self.config else min(30, self.config['intervalo_segundos'])
         if self.config_at is not None and self.clock() - self.config_at < refresh:
@@ -170,7 +178,6 @@ class Collector:
             log.warning('Relógio do coletor difere do servidor em %.0f s; sincronize o horário (NTP).', skew)
         ids = {d['id'] for d in config['dispositivos']}
         for device in config['dispositivos']:
-            # A collection requested on the web interface arrives as an earlier proxima_coleta.
             requested = datetime.fromisoformat(device['proxima_coleta'].replace('Z', '+00:00')) <= server_now
             if requested or device['id'] not in self.next_due:
                 self.next_due[device['id']] = self.clock()
@@ -179,6 +186,7 @@ class Collector:
             log.info('Configuração recebida: %s dispositivos atribuídos.', len(ids))
         self.config, self.config_at = config, self.clock()
 
+    # Envia a fila em lotes
     def flush(self):
         size = self.config['lote_maximo'] if self.config else 100
         while len(self.queue) or self.pending_errors:
@@ -198,16 +206,18 @@ class Collector:
             if retry or not batch:
                 break
 
+    # Envia o sinal de vida
     def heartbeat(self):
         self.api.call('POST', '/api/coletor/heartbeat', dict(versao=VERSION, fila_pendente=len(self.queue)))
 
-    # --- Measurement side -------------------------------------------------------------
+    # Dispositivos com medição vencida
     def due_devices(self):
         if not self.config:
             return []
         now = self.clock()
         return [d for d in self.config['dispositivos'] if self.next_due.get(d['id'], now) <= now]
 
+    # Mede os dispositivos vencidos em paralelo
     def collect(self):
         devices = self.due_devices()
         if not devices:
@@ -222,12 +232,12 @@ class Collector:
         if samples:
             self.queue.add(samples)
         if errors:
-            # Errors are reported, not queued on disk: they describe the current state only.
             self.pending_errors = (self.pending_errors + errors)[-50:]
             for e in errors:
                 log.error('Coleta não executada dispositivo=%s tipo=%s', e['dispositivo_id'], e['tipo'])
         return len(samples)
 
+    # Uma volta do laço: configurar, medir, enviar, heartbeat
     def step(self):
         if self.api_ready():
             try:
@@ -235,7 +245,6 @@ class Collector:
                 self.api_ok()
             except ApiUnavailable as error:
                 self.api_failed(error)
-        # Measurement continues during API outages; results wait in the local queue.
         self.collect()
         if self.api_ready():
             try:
@@ -245,6 +254,7 @@ class Collector:
             except ApiUnavailable as error:
                 self.api_failed(error)
 
+    # Laço principal do coletor
     def run(self, once=False):
         log.info('Coletor EdgeHealth %s iniciado. API: %s', VERSION, self.api.base)
         while not self.stop.is_set():
@@ -254,6 +264,7 @@ class Collector:
             self.stop.wait(1)
 
 
+# Lê a credencial de arquivo ou variável de ambiente
 def read_token(args):
     if args.token_file:
         return Path(args.token_file).read_text(encoding='utf-8').strip()
@@ -263,6 +274,7 @@ def read_token(args):
     return token
 
 
+# Exige HTTPS no endereço do servidor
 def check_url(url, allow_http):
     parsed = urllib.parse.urlparse(url)
     local = parsed.hostname in ('localhost', '127.0.0.1', '::1')
@@ -271,6 +283,7 @@ def check_url(url, allow_http):
     raise SystemExit('Use HTTPS para a API. HTTP é aceito apenas para localhost ou com --allow-http em laboratório.')
 
 
+# Início do programa: lê opções e roda o coletor
 def main(argv=None):
     parser = argparse.ArgumentParser(description='Coletor remoto EdgeHealth')
     parser.add_argument('--api-url', default=os.getenv('EDGEHEALTH_API_URL'), help='Ex.: https://edgehealth.exemplo.org')

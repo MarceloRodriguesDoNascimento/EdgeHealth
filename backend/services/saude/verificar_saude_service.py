@@ -1,10 +1,10 @@
+# Caso de uso: dizer se o servidor está pronto
 from repositories import BancoRepository
 
 
+# Verificação de saúde
 class VerificarSaudeService:
-    """Ready only when the database answers and its schema is at the latest migration."""
-
+    # Confere o banco e devolve o status
     def executar(self):
-        """(response body, ready)."""
         pronto = BancoRepository.esquema_atualizado()
         return dict(status='ok' if pronto else 'migrations_pendentes'), pronto

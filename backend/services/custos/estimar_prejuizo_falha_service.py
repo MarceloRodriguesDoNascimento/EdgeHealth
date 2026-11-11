@@ -1,11 +1,12 @@
+# Caso de uso: prejuízo de uma falha
 from models import Dispositivo, Empresa
 from .calculadora_prejuizo import CalculadoraPrejuizo
 from .identificar_grupo_compartilhado_service import IdentificarGrupoCompartilhadoService
 
 
+# Estimativa de uma falha
 class EstimarPrejuizoFalhaService:
-    """Estimate of one incident plus, for a shared outage, the de-duplicated group total."""
-
+    # Calcula o prejuízo e, se houver, o do grupo
     def executar(self, falha, agora=None):
         empresa = Empresa.buscar_por_id(Dispositivo.buscar_por_id(falha.dispositivo_id).empresa_id)
         result = CalculadoraPrejuizo.estimar(falha, empresa, agora)

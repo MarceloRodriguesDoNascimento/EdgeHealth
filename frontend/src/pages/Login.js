@@ -1,6 +1,8 @@
+// Telas de login, cadastro e aceite dos termos
 import { el, label, input, form, button, brandLogo, port } from '../ui/dom.js';
 import { apiFetch, json } from '../services/api.js';
 
+// Tela de login ou cadastro
 export function Login(onSuccess, registration = false) {
   const intro = el('div', { className: 'auth-intro' },
     el('div', { className: 'brand light' }, brandLogo(), el('span', { 'aria-hidden': 'true' }, 'EdgeHealth')),
@@ -27,23 +29,25 @@ export function Login(onSuccess, registration = false) {
   return el('main', { className: 'auth-layout' }, intro, surface);
 }
 
-// A panel powering on, port by port; one port is down. Decorative: the same part that shows real devices after sign-in.
+// Animação do painel na entrada
 function powerOn() {
   const states = ['ONLINE', 'ONLINE', 'ONLINE', 'INSTAVEL', 'ONLINE', 'ONLINE', 'ONLINE', 'ONLINE', 'OFFLINE', 'ONLINE', 'ONLINE', 'ONLINE', 'ONLINE', 'ONLINE', 'SEM_COLETA', 'ONLINE'];
   return el('div', { className: 'ports', 'aria-hidden': 'true' }, states.map((state, i) => port(state, { style: `--i:${i}` })));
 }
 
+// Links para Termos e Privacidade
 const legalLinks = () => el('p', { className: 'muted small legal-links' },
   el('a', { href: '/termos.html', target: '_blank', rel: 'noopener' }, 'Termos de Uso'), ' · ',
   el('a', { href: '/privacidade.html', target: '_blank', rel: 'noopener' }, 'Aviso de Privacidade'));
 
+// Caixa de aceite dos termos
 function termsCheckbox() {
   return el('label', { className: 'checkbox full' }, el('input', { type: 'checkbox', name: 'aceite_termos', required: true }),
     el('span', {}, 'Li e aceito os ', el('a', { href: '/termos.html', target: '_blank', rel: 'noopener' }, 'Termos de Uso'),
       ' e declaro ciência do ', el('a', { href: '/privacidade.html', target: '_blank', rel: 'noopener' }, 'Aviso de Privacidade'), '.'));
 }
 
-// Shown when the account has not accepted the current version of the Terms (e.g. created by an administrator).
+// Tela para aceitar os termos
 export function TermsPending(session, onAccepted, onLogout) {
   return el('main', { className: 'auth-layout' }, el('div', { className: 'auth-form' },
     el('h2', {}, 'Antes de continuar'),

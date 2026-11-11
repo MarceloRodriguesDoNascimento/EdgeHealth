@@ -1,3 +1,4 @@
+# Caso de uso: registrar o impacto da ocorrência
 from app import validation as v
 from models import Impacto, utcnow
 from repositories import Transacao
@@ -6,14 +7,13 @@ from services.diagnosticos.atualizar_diagnosticos_service import AtualizarDiagno
 from services.falhas.obter_falha_service import ObterFalhaService
 
 
+# Registro de impacto
 class RegistrarImpactoService:
-    """Affected users, direct costs and notes of an incident; severity is recalculated with them.
-    usuarios_afetados empty/null: the device's people are used in the estimate."""
-
     CAMPOS = ('usuarios_afetados', 'observacao', 'custos_diretos')
 
+    # Grava o impacto e recalcula a severidade
     def executar(self, empresa_id, id, dados):
-        falha = ObterFalhaService().buscar(empresa_id, id)  # 404 of another company before payload errors
+        falha = ObterFalhaService().buscar(empresa_id, id)
         dados = v.json_object(dados, self.CAMPOS)
         impact = Impacto.buscar_um_por(falha_id=falha.id) or Impacto(falha_id=falha.id)
         if 'usuarios_afetados' in dados:

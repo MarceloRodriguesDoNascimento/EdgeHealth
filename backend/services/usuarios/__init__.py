@@ -1,1 +1,2 @@
-"""Users of a company (managed by its administrators)."""
+# Services da equipe da empresa
+pass

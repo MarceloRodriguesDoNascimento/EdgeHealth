@@ -1,9 +1,10 @@
+# Caso de uso: decidir o status do dispositivo pela medição
 from flask import current_app
 
 
+# Classificação de status
 class ClassificarStatusService:
-    """Status state machine: OFFLINE/recovery need confirmations; latency or loss make it INSTAVEL."""
-
+    # Atualiza contadores e define online, instável ou offline
     def executar(self, dispositivo, resultado):
         cfg = current_app.config
         if resultado.received == 0:
@@ -20,9 +21,9 @@ class ClassificarStatusService:
             return 'INSTAVEL'
         return 'ONLINE'
 
+    # Classifica uma amostra isolada
     @staticmethod
     def instantaneo(resultado):
-        """Stateless classification of a single sample, without confirmation counters."""
         cfg = current_app.config
         if resultado.received == 0:
             return 'OFFLINE'

@@ -1,10 +1,11 @@
+# Caso de uso: calcular a severidade da falha
 from flask import current_app
 from models import Impacto, iso
 
 
+# Cálculo de severidade
 class CalcularSeveridadeService:
-    """Severity from unavailability, duration, correlated devices and informed affected users."""
-
+    # Define a severidade pela duração, correlação e impacto
     def executar(self, falha, dispositivos_relacionados, agora):
         cfg = current_app.config
         impact = Impacto.buscar_um_por(falha_id=falha.id)

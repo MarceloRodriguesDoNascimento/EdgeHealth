@@ -1,4 +1,4 @@
-"""database/create_database.sql must create exactly the schema of the Alembic migrations."""
+# Testes do script SQL do banco
 import re
 import sqlite3
 from pathlib import Path
@@ -36,7 +36,6 @@ def normalized(sql):
 
 
 def describe(path):
-    """Everything SQLite knows about the schema, per table."""
     c = sqlite3.connect(path)
     try:
         tables = [r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")]
@@ -54,7 +53,6 @@ def describe(path):
                 columns=[(r[1], r[2], r[3], r[4], r[5]) for r in c.execute(f'PRAGMA table_info("{t}")')],
                 foreign_keys=sorted((r[2], r[3], r[4], r[5], r[6]) for r in c.execute(f'PRAGMA foreign_key_list("{t}")')),
                 indexes=indexes,
-                # CHECK, UNIQUE and constraint names only exist in the CREATE TABLE text.
                 definition=normalized(sql),
             )
         return schema
@@ -69,7 +67,6 @@ def test_script_creates_the_same_schema_as_the_migrations(databases):
     for table in migrations:
         for aspect in ('columns', 'foreign_keys', 'indexes', 'definition'):
             assert script[table][aspect] == migrations[table][aspect], f'{table}.{aspect} difere das migrations'
-    # The comparison is not vacuous: 14 tables with their CHECK/UNIQUE/FK constraints and partial indexes.
     assert len(migrations) == 14
     assert sum(t['definition'].count('CONSTRAINT') for t in migrations.values()) >= 40
     assert migrations['falhas']['indexes']['uq_falha_aberta_dispositivo'][4] == "estado = 'ABERTA'"
@@ -83,8 +80,8 @@ def test_script_is_at_the_latest_migration_and_passes_db_check(databases):
             'Nova migration: regenere database/create_database.sql (python database/gerar_create_database.py)'
     app = app_for(by_script)
     with app.app_context():
-        check(directory=MIGRATIONS)  # raises if the models differ from the database
-        upgrade(directory=MIGRATIONS)  # recognized as up to date: nothing to apply
+        check(directory=MIGRATIONS)
+        upgrade(directory=MIGRATIONS)
         db.engine.dispose()
 
 

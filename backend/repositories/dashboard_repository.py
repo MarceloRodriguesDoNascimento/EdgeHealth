@@ -1,10 +1,10 @@
+# Contagens do painel em SQL com GROUP BY
 from sqlalchemy import text
 from app.extensions import db
 
 
+# Consultas do painel
 class DashboardRepository:
-    """Dashboard aggregations written in SQL (GROUP BY executed by the database)."""
-
     STATUS_SQL = text("""
         SELECT COALESCE(status, 'SEM_COLETA') AS status, COUNT(*) AS total
         FROM dispositivos
@@ -20,13 +20,13 @@ class DashboardRepository:
         GROUP BY f.severidade
     """)
 
+    # Quantos dispositivos em cada status
     @classmethod
     def contagem_por_status(cls, empresa_id):
-        """{status: devices} of the active devices; SEM_COLETA = never measured."""
         return {linha.status: linha.total for linha in db.session.execute(cls.STATUS_SQL, {'empresa_id': empresa_id})}
 
+    # Quantas falhas abertas em cada severidade
     @classmethod
     def contagem_por_severidade(cls, empresa_id):
-        """{severity: open incidents} of the company."""
         return {linha.severidade: linha.total
                 for linha in db.session.execute(cls.SEVERIDADE_SQL, {'empresa_id': empresa_id})}

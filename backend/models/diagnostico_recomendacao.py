@@ -1,7 +1,9 @@
+# Model que liga diagnósticos a recomendações (muitos para muitos)
 from app.extensions import db
 from .base import BaseModel
 
 
+# Tabela diagnostico_recomendacoes
 class DiagnosticoRecomendacao(BaseModel):
     __tablename__ = 'diagnostico_recomendacoes'
     diagnostico_id = db.Column(db.Integer, db.ForeignKey('diagnosticos.id', ondelete='CASCADE'), primary_key=True)

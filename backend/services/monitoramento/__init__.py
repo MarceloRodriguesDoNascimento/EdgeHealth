@@ -1,4 +1,4 @@
-"""Monitoring rules: ICMP probe, status classification and the measurement pipeline."""
+# Services do monitoramento dos dispositivos
 from .resultado_sonda import CollectorError, ProbeResult
 from .sonda_icmp_service import SondaIcmpService
 from .classificar_status_service import ClassificarStatusService

@@ -1,15 +1,15 @@
+# Apaga dados antigos pela política de retenção (LGPD)
 from datetime import timedelta
 from sqlalchemy import delete, func, select
 from app.extensions import db
 from models import AuthSession, LoginAttempt, Metrica
 
 
+# Consultas de retenção
 class RetencaoRepository:
-    """Retention policy: raw samples and expired security records."""
-
+    # Apaga registros mais antigos que o corte
     @staticmethod
     def expurgar(corte, agora, simular):
-        """{table: rows older than the limit}; rows are deleted unless `simular`."""
         alvos = [(Metrica, Metrica.coletada_em < corte),
                  (AuthSession, AuthSession.expires_at < agora),
                  (LoginAttempt, LoginAttempt.created_at < agora - timedelta(days=1))]

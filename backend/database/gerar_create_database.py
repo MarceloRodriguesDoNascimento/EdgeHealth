@@ -1,12 +1,4 @@
-"""Regenerates backend/database/create_database.sql from the Alembic migrations.
-
-The migrations are applied to an empty temporary SQLite database and the final schema stored by
-SQLite (sqlite_master) is written in dependency order, one column/constraint per line. Definitions
-are copied verbatim, so the script creates exactly the schema of "flask db upgrade".
-
-Usage (inside backend/, with the virtualenv active):
-    python database/gerar_create_database.py
-"""
+# Gera o create_database.sql a partir das migrations
 import re
 import sqlite3
 import sys
@@ -18,7 +10,6 @@ DESTINO = BACKEND / 'database' / 'create_database.sql'
 if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
-# Parents before children (foreign keys); alembic_version last.
 ORDEM = ['empresas', 'usuarios', 'auth_sessions', 'login_attempts', 'coletores', 'dispositivos', 'metricas',
          'falhas', 'impactos', 'diagnosticos', 'recomendacoes', 'diagnostico_recomendacoes', 'registros_legados',
          'alembic_version']
@@ -49,8 +40,8 @@ BEGIN TRANSACTION;
 """
 
 
+# Separa as colunas de um CREATE TABLE
 def dividir(corpo):
-    """Splits the body of a CREATE TABLE on top-level commas (outside parentheses and quotes)."""
     partes, atual, nivel, aspas = [], '', 0, None
     for ch in corpo:
         if aspas:
@@ -70,6 +61,7 @@ def dividir(corpo):
     return [re.sub(r'\s+', ' ', p) for p in partes if p]
 
 
+# Formata um CREATE TABLE com uma coluna por linha
 def formatar_tabela(sql):
     inicio, fim = sql.index('('), sql.rindex(')')
     cabecalho = re.sub(r'\s+', ' ', sql[:inicio]).strip()
@@ -77,6 +69,7 @@ def formatar_tabela(sql):
     return cabecalho + ' (\n    ' + ',\n    '.join(itens) + '\n);'
 
 
+# Aplica as migrations num banco temporário e lê o esquema
 def esquema_das_migrations():
     from flask_migrate import upgrade
     from app import create_app, db
@@ -96,6 +89,7 @@ def esquema_das_migrations():
     return objetos, revisao
 
 
+# Monta o texto final do script SQL
 def gerar():
     from services.diagnosticos.popular_catalogo_service import PopularCatalogoService
     objetos, revisao = esquema_das_migrations()

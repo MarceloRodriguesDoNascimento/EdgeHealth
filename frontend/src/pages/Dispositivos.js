@@ -1,13 +1,15 @@
+// Tela Dispositivos
 import { el, input, label, button, form, table, badge, modal, confirmAction, toast, date, number, pageHeader, select, moneyInput } from '../ui/dom.js';
 import { apiFetch, json } from '../services/api.js';
 
-// A silent collector means "no recent evidence", never "device offline".
 const COLLECTOR_NOTE = { DESATUALIZADO: ' · sem contato recente', NUNCA_CONECTADO: ' · ainda não conectado', REVOGADO: ' · revogado' };
 
+// Monta a tela
 export async function Dispositivos(session) {
   const body = el('div');
   const archived = el('input', { type: 'checkbox', name: 'arquivados' });
   let refresh;
+  // Formulário de cadastrar ou editar dispositivo
   const editor = async (device = null) => {
     const collectors = (await apiFetch('/coletores').catch(() => [])).filter(c => c.estado !== 'REVOGADO' || c.id === device?.coletor_id);
     const tipo = input('tipo', 'Roteador, switch, servidor…', { value: device?.tipo || '', required: true, maxLength: 50 });
@@ -59,17 +61,19 @@ export async function Dispositivos(session) {
 
 const LOSS = [['100', 'Para tudo', '100%'], ['50', 'Trabalha com dificuldade', '50%'], ['10', 'Quase não sente', '10%']];
 
-// "Impacto no negócio": filled with the defaults for the type (from the API) until the person edits it.
+// Campos de impacto com sugestão pelo tipo
 export function impactFields(device, tipoInput) {
   let touched = Boolean(device && device.usuarios_dependentes !== null && device.usuarios_dependentes !== undefined);
   const users = input('usuarios_dependentes', 'Ex.: 10', { type: 'number', inputMode: 'numeric', min: 0, step: 1, value: device?.usuarios_dependentes ?? '' });
   const custom = input('perda_custom', '0 a 100', { type: 'number', inputMode: 'numeric', min: 0, max: 100, step: 1, 'aria-label': 'Perda de produtividade personalizada (%)' });
+  // Opção de perda de produtividade
   const radio = value => el('input', { type: 'radio', name: 'perda_opcao', value });
   const options = el('fieldset', { className: 'choice-group full' }, el('legend', {}, 'Sem ele, a equipe…'),
     LOSS.map(([value, text, pct]) => el('label', { className: 'choice' }, radio(value), el('span', {}, text, el('small', { className: 'muted' }, pct)))),
     el('label', { className: 'choice' }, radio('custom'), el('span', {}, 'Personalizar', el('small', { className: 'muted' }, '% exato'))), custom);
   const revenue = input('receita_hora_dependente', 'Opcional · Ex.: 150,00', { inputMode: 'decimal', autoComplete: 'off', value: device?.receita_hora_dependente ? Number(device.receita_hora_dependente).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '' });
   const usersHint = el('small', { className: 'muted' }), revenueHint = el('small', { className: 'muted' });
+  // Marca a opção de perda
   const setLoss = pct => {
     const preset = LOSS.find(([v]) => Number(v) === Number(pct));
     options.querySelector(`[value="${preset ? preset[0] : 'custom'}"]`).checked = true;
@@ -77,6 +81,7 @@ export function impactFields(device, tipoInput) {
     custom.hidden = Boolean(preset);
   };
   setLoss(device?.perda_produtividade_pct ?? 50);
+  // Busca e aplica a sugestão de impacto
   const apply = async () => {
     try {
       const d = await apiFetch(`/dispositivos/impacto-padrao?${new URLSearchParams({ tipo: tipoInput.value })}`);
@@ -85,14 +90,14 @@ export function impactFields(device, tipoInput) {
       if (touched) return;
       users.value = d.usuarios ?? '';
       setLoss(d.perda_pct);
-    } catch { /* defaults are a convenience; the form still works without them */ }
+    } catch {  }
   };
   let timer;
   tipoInput.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(apply, 300); });
   [users, custom, revenue].forEach(i => i.addEventListener('input', () => { touched = true; }));
   options.addEventListener('change', event => {
     touched = true;
-    if (event.target.name !== 'perda_opcao') return;  // the custom % input also bubbles "change"
+    if (event.target.name !== 'perda_opcao') return;
     custom.hidden = event.target.value !== 'custom';
     if (!custom.hidden) custom.focus();
   });
@@ -114,11 +119,13 @@ export function impactFields(device, tipoInput) {
   };
 }
 
+// Janela de métricas do dispositivo
 async function showMetrics(d) {
   const body = el('div');
   const type = select('tipo', [['','Todas as métricas'],['latencia','Latência'],['perda_pacotes','Perda de pacotes'],['disponibilidade','Disponibilidade']]);
   const start = input('inicio','',{type:'date'}), end = input('fim','',{type:'date'});
   const paging = el('div',{className:'pagination'}); let page = 1;
+  // Busca as métricas com os filtros
   const load = async () => {
     const query = new URLSearchParams({ dispositivo_id:d.id,limite:100,pagina:page,tipo:type.value,inicio:start.value,fim:end.value });
     const result = await apiFetch(`/metricas?${query}`);

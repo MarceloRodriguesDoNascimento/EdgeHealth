@@ -1,3 +1,4 @@
+# Monta a aplicação Flask: configuração, rotas, erros e o site
 import logging
 from pathlib import Path
 from flask import Flask, jsonify, send_from_directory
@@ -6,6 +7,7 @@ from werkzeug.exceptions import HTTPException
 from .config import Config
 from .extensions import db, migrate
 
+# Cria e configura a aplicação Flask
 def create_app(config=None):
     app = Flask(__name__, static_folder=None)
     app.config.from_object(Config)
@@ -13,34 +15,37 @@ def create_app(config=None):
         app.config.update(config)
     Path(app.instance_path).mkdir(parents=True, exist_ok=True)
     if app.config['TRUST_PROXY']:
-        # Behind exactly N trusted reverse proxies (TLS termination): real client IP and scheme.
         from werkzeug.middleware.proxy_fix import ProxyFix
         hops = app.config['TRUST_PROXY']
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=hops, x_proto=hops, x_host=hops)
     db.init_app(app)
-    import models  # noqa: F401  (registers every table in the metadata)
+    import models
     migrate.init_app(app, db, render_as_batch=True)
     from controllers.rotas import api
     from .cli import register_cli
     app.register_blueprint(api)
     register_cli(app)
 
+    # Erro de banco (dado repetido ou inválido) vira resposta 409
     @app.errorhandler(IntegrityError)
     def integrity_error(error):
         db.session.rollback()
         return jsonify(erro='Operação conflitante ou referência inválida. Verifique os dados.'), 409
 
+    # Erros HTTP dos Services voltam como JSON com a mensagem
     @app.errorhandler(HTTPException)
     def http_error(error):
         db.session.rollback()
         return jsonify(erro=error.description), error.code
 
+    # Erro inesperado: registra no log e responde 500
     @app.errorhandler(Exception)
     def unexpected_error(error):
         db.session.rollback()
         app.logger.exception('Erro não previsto durante a requisição')
         return jsonify(erro='Não foi possível concluir a operação.'), 500
 
+    # Adiciona cabeçalhos de segurança em toda resposta
     @app.after_request
     def headers(response):
         response.headers['X-Content-Type-Options'] = 'nosniff'
@@ -53,6 +58,7 @@ def create_app(config=None):
             response.headers['Strict-Transport-Security'] = 'max-age=31536000'
         return response
 
+    # Entrega os arquivos do site (frontend/dist)
     @app.get('/')
     @app.get('/<path:path>')
     def frontend(path='index.html'):

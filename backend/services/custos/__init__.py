@@ -1,3 +1,4 @@
+# Services da estimativa de prejuízo em R$
 from .categoria_dispositivo import CategoriaDispositivo
 from .expediente import Expediente
 from .calculadora_prejuizo import CalculadoraPrejuizo

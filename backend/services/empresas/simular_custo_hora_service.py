@@ -1,13 +1,13 @@
+# Caso de uso: prévia do custo por hora sem salvar
 from decimal import Decimal
 from app import validation as v
 from models import Empresa
 from services.custos.calculadora_prejuizo import CalculadoraPrejuizo
 
 
+# Prévia de custo
 class SimularCustoHoraService:
-    """Preview of the cost per hour while the administrator types, without saving: the formula lives only here.
-    Empty charges factor or hours per month fall back to the defaults of the Empresa model."""
-
+    # Calcula o custo por hora com os valores digitados
     def executar(self, dados):
         salary = v.optional(dados.get('salario_medio'), v.decimal_value, 'Salário médio')
         factor = dados.get('fator_encargos')

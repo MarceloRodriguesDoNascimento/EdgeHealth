@@ -1,8 +1,4 @@
-"""Windows wrapper of the collector: connection messages and scheduled-task definition.
-
-The window, icacls and schtasks need a Windows desktop; they are exercised manually (see
-collector/README.md). Everything decided in code is tested here, on any OS.
-"""
+# Testes do coletor para Windows
 import sys
 import threading
 import xml.etree.ElementTree as ET
@@ -13,7 +9,7 @@ from werkzeug.serving import make_server
 from conftest import auth_headers
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'collector' / 'windows'))
-import edgehealth_windows as ew  # noqa: E402
+import edgehealth_windows as ew
 
 NS = {'t': 'http://schemas.microsoft.com/windows/2004/02/mit/task'}
 NOW = datetime(2026, 10, 7, 12, 0, tzinfo=timezone.utc)
@@ -64,7 +60,7 @@ def test_connection_against_the_real_collector_api(app, signed):
     srv = make_server('127.0.0.1', 0, app, threaded=True)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     try:
-        url = f'http://127.0.0.1:{srv.server_port}'  # HTTP is accepted only for localhost
+        url = f'http://127.0.0.1:{srv.server_port}'
         assert ew.test_connection(url, token) == (True, 'Conectado — 0 dispositivos', 0)
         assert ew.test_connection(url, token[:-2] + 'xx')[0] is False
     finally:
@@ -74,7 +70,7 @@ def test_connection_against_the_real_collector_api(app, signed):
 @pytest.mark.parametrize('scope,trigger,user', [('maquina', 'BootTrigger', 'S-1-5-18'), ('usuario', 'LogonTrigger', 'S-1-5-21-1-2-3-1001')])
 def test_task_is_hidden_unlimited_and_restarts_on_failure(scope, trigger, user):
     xml = ew.task_xml(scope, r'C:\ProgramData\EdgeHealth\EdgeHealthColetor.exe', r'--servico --dados "C:\Pasta & Cia"', user)
-    root = ET.fromstring(xml.split('\n', 1)[1])  # the declaration says UTF-16 (file encoding for schtasks)
+    root = ET.fromstring(xml.split('\n', 1)[1])
     assert root.find(f't:Triggers/t:{trigger}', NS) is not None
     assert root.findtext('t:Principals/t:Principal/t:UserId', namespaces=NS) == user
     settings = root.find('t:Settings', NS)
@@ -87,7 +83,6 @@ def test_task_is_hidden_unlimited_and_restarts_on_failure(scope, trigger, user):
 
 
 def test_bundled_certificates_are_installed_for_the_collector_requests():
-    # certifi ships inside the .exe (build.ps1); the backend environment may not have it.
     pytest.importorskip('certifi')
     import urllib.request
     previous = urllib.request._opener
@@ -100,17 +95,12 @@ def test_bundled_certificates_are_installed_for_the_collector_requests():
 
 
 def test_restricted_machine_install_is_reported_not_crashing(monkeypatch, tmp_path):
-    # Opened without elevation, the machine-wide folder (SYSTEM/Administrators only) is unreadable.
     class Locked(type(tmp_path)):
         def exists(self, *a, **k):
             raise PermissionError(13, 'Acesso negado')
     monkeypatch.setattr(ew, 'scope_dir', lambda scope: Locked(tmp_path / scope))
     assert ew.installed() == ('maquina', tmp_path / 'maquina')
 
-
-# --- Regression: install made from a terminal inside an MSIX-packaged app (Claude desktop) -----
-# Writes to %LOCALAPPDATA% were redirected to Packages/<family>/LocalCache/Local, the task kept
-# the path the installer saw, and Task Scheduler (outside the package) failed with 0x80070002.
 
 def test_long_path_prefixes_are_removed():
     assert ew.strip_long_prefix(r'\\?\C:\Users\a\AppData\Local\Packages\P\LocalCache\Local\EdgeHealth') == \
@@ -127,7 +117,6 @@ def test_physical_path_of_a_normal_folder_is_itself(tmp_path):
 
 @pytest.fixture
 def fake_windows(monkeypatch, tmp_path):
-    """Isolated LOCALAPPDATA/ProgramData and a recorder instead of schtasks/icacls/taskkill."""
     local, program_data = tmp_path / 'Local', tmp_path / 'ProgramData'
     local.mkdir(); program_data.mkdir()
     monkeypatch.setenv('LOCALAPPDATA', str(local)); monkeypatch.setenv('ProgramData', str(program_data))
@@ -187,15 +176,14 @@ def test_repair_moves_a_redirected_install_keeping_credential_and_queue(fake_win
     assert (target / 'fila.jsonl').read_text(encoding='utf-8') == '{"id": "a"}\n'
     assert (target / 'logs' / 'coletor.log').exists() and not (target / 'coletor.pid').exists()
     assert not source.exists()
-    assert ['taskkill', '/PID', '999999', '/T', '/F'] in calls  # the copy started by hand is ended
+    assert ['taskkill', '/PID', '999999', '/T', '/F'] in calls
     assert f'--dados "{target}"' in created_task_xml(calls)
     assert ['schtasks', '/Run', '/TN', ew.TASK] in calls
 
 
 def test_single_instance_lock_follows_the_physical_folder_not_the_task_name(monkeypatch, tmp_path):
-    # The isolated test install collided with the real one because the lock used a fixed name.
     seen, real, other = tmp_path / 'seen', tmp_path / 'real', tmp_path / 'other'
     monkeypatch.setattr(ew, 'physical', lambda p: real if Path(p) in (seen, real) else Path(p))
-    assert ew.instance_name('usuario', seen) == ew.instance_name('usuario', real)  # hand-started copy vs task
+    assert ew.instance_name('usuario', seen) == ew.instance_name('usuario', real)
     assert ew.instance_name('usuario', other) != ew.instance_name('usuario', real)
     assert ew.instance_name('maquina', real).startswith('Global\\') and ew.instance_name('usuario', real).startswith('Local\\')

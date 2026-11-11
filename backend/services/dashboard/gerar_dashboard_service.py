@@ -1,3 +1,4 @@
+# Caso de uso: montar os dados da Visão da rede
 from datetime import timedelta
 from app import validation as v
 from models import iso, utcnow
@@ -8,10 +9,9 @@ from services.custos.resumir_prejuizo_service import ResumirPrejuizoService
 from services.dispositivos.obter_dispositivo_service import ObterDispositivoService
 
 
+# Dados do painel
 class GerarDashboardService:
-    """Indicators by status and severity, recent incidents, collectors, the sample series of one
-    device (default: last 24 h of the first device) and the estimated loss of the last 30 days."""
-
+    # Junta contagens, gráficos, falhas, coletores e prejuízo
     def executar(self, empresa_id, dispositivo_id=None, inicio=None, fim=None):
         now = utcnow()
         devices = DispositivoRepository.listar_ativos_da_empresa(empresa_id)
@@ -22,7 +22,6 @@ class GerarDashboardService:
                       falhas_abertas=sum(severidades.values()),
                       desatualizados=sum(Serializador.dispositivo(d)['desatualizado'] for d in devices))
         recent = FalhaRepository.recentes_da_empresa(empresa_id, limite=8)
-        # Individual per-device series avoid combining different devices into a fictitious measurement.
         device_id = v.query_int(dispositivo_id, 'dispositivo_id')
         if device_id:
             ObterDispositivoService().buscar(empresa_id, device_id)
@@ -39,5 +38,4 @@ class GerarDashboardService:
                     falhas_recentes=[Serializador.falha(f) for f in recent], serie=series, serie_total=sample_total,
                     dispositivo_id=device_id, dispositivos=[Serializador.dispositivo(d) for d in devices], atualizado_em=iso(now),
                     custos=ResumirPrejuizoService().executar(empresa_id, now),
-                    # Devices with most incidents overlapping the last 30 days (same window as custos).
                     falhas_por_dispositivo=FalhaRepository.ranking_dispositivos(empresa_id, now - timedelta(days=30), None, limite=5))

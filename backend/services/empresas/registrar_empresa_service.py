@@ -1,3 +1,4 @@
+# Caso de uso: cadastrar nova empresa e seu admin
 from werkzeug.exceptions import BadRequest, Conflict
 from werkzeug.security import generate_password_hash
 from app import validation as v
@@ -7,9 +8,9 @@ from services.autenticacao.criar_sessao_service import CriarSessaoService, Sessa
 from services.autenticacao.obter_perfil_service import ObterPerfilService
 
 
+# Cadastro de empresa
 class RegistrarEmpresaService:
-    """Self-service sign-up: new company, its first administrator and an open session."""
-
+    # Cria empresa e administrador e abre a sessão
     def executar(self, dados):
         if dados.get('aceite_termos') is not True:
             raise BadRequest('Para criar a conta, aceite os Termos de Uso e declare ciência do Aviso de Privacidade.')
@@ -25,5 +26,5 @@ class RegistrarEmpresaService:
         AceitarTermosService.registrar_aceite(user)
         user.salvar(commit=False)
         corpo = ObterPerfilService().executar(user)
-        token, csrf = CriarSessaoService().executar(user)  # confirms company, user and session together
+        token, csrf = CriarSessaoService().executar(user)
         return SessaoIniciada(corpo, token, csrf)

@@ -1,3 +1,4 @@
+// Configuração do Vite (servidor de desenvolvimento e build)
 import { defineConfig } from 'vite';
 export default defineConfig({
   server: {
