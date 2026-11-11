@@ -1,7 +1,10 @@
+// Tela de uma ocorrência
 import { el,input,label,form,pageHeader,button,badge,date,duration,number,table,toast,empty,brl,moneyInput,port,human } from '../ui/dom.js';
 import { apiFetch,json } from '../services/api.js';
+// Monta a tela da ocorrência
 export async function Falha(id){
   const root=el('section');
+  // Busca e desenha a ocorrência
   const load=async()=>{
     const f=await apiFetch(`/falhas/${id}`);
     const diag=f.diagnostico;
@@ -43,13 +46,13 @@ export async function Falha(id){
   await load();return root;
 }
 
-// The incident in one sentence: what is wrong, on which device, for how long.
+// Frase de resumo da ocorrência
 export function incidentSummary(f){
   const time=duration(f.duracao_segundos),state=f.tipo==='INDISPONIBILIDADE'?'offline':'instável';
   return f.estado==='ABERTA'?`${f.dispositivo} está ${state} há ${time}.`:`${f.dispositivo} ficou ${state} por ${time}.`;
 }
 
-// Financial loss estimate: always the open calculation next to the value, never a bare number.
+// Painel do prejuízo estimado
 export function lossPanel(p){
   const root=el('div',{className:'panel loss-panel'},el('h2',{},'Prejuízo estimado'));
   if(!p||!p.configurado){
@@ -65,8 +68,7 @@ export function lossPanel(p){
   return root;
 }
 
-// Plain-language explanation by the AI (Gemini) from the diagnosis the system already computed.
-// `explain` returns the API answer; injected so the panel can be tested without the network.
+// Painel da explicação com IA
 export function aiPanel(f,explain){
   const available=Boolean(f.ia_disponivel);
   const output=el('div',{className:'ai-output','aria-live':'polite'});

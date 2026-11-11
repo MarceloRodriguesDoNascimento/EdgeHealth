@@ -1,1 +1,2 @@
-"""Company (tenant) registration, data and cost configuration."""
+# Services da empresa e dos custos
+pass

@@ -1,13 +1,13 @@
+# Caso de uso: achar as falhas da mesma queda compartilhada
 from datetime import timedelta
 from flask import current_app
 from models import Diagnostico, Dispositivo
 from repositories import FalhaRepository
 
 
+# Grupo compartilhado
 class IdentificarGrupoCompartilhadoService:
-    """Incidents of the same shared outage: this one has COMPARTILHADA and the others are
-    unavailability incidents of the company that started within the correlation window."""
-
+    # Devolve as falhas do mesmo grupo
     def executar(self, falha):
         diag = Diagnostico.buscar_um_por(falha_id=falha.id)
         if not diag or 'COMPARTILHADA' not in {c.get('regra') for c in diag.causas or []}:

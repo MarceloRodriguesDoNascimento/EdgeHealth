@@ -1,3 +1,4 @@
+# Objetos compartilhados de banco de dados (SQLAlchemy e migrations)
 import sqlite3
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
@@ -12,6 +13,7 @@ db = SQLAlchemy(metadata=MetaData(naming_convention={
 }))
 migrate = Migrate()
 
+# Liga chaves estrangeiras e ajustes do SQLite em cada conexão
 @event.listens_for(Engine, 'connect')
 def sqlite_integrity(connection, _):
     if isinstance(connection, sqlite3.Connection):

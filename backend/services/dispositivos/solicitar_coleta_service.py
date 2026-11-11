@@ -1,11 +1,12 @@
+# Caso de uso: pedir medição imediata
 from werkzeug.exceptions import Conflict
 from models import utcnow
 from .obter_dispositivo_service import ObterDispositivoService
 
 
+# Pedido de coleta
 class SolicitarColetaService:
-    """Brings the next measurement of the device forward (worker or remote collector)."""
-
+    # Antecipa a próxima medição para agora
     def executar(self, empresa_id, id):
         d = ObterDispositivoService().buscar(empresa_id, id, incluir_arquivados=False)
         if d.em_coleta(utcnow()):

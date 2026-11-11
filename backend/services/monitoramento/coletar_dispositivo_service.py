@@ -1,3 +1,4 @@
+# Caso de uso: worker local mede um dispositivo
 import logging
 from datetime import timedelta
 from models import Dispositivo, utcnow
@@ -11,18 +12,17 @@ from .validar_configuracao_monitor_service import ValidarConfiguracaoMonitorServ
 log = logging.getLogger(__name__)
 
 
+# Coleta pelo worker local
 class ColetarDispositivoService:
-    """Local worker: lease, probe (outside any DB transaction), record and release one device."""
-
+    # Reserva, faz o ping e registra a medição
     def executar(self, app, dispositivo_id, sonda=None):
         with app.app_context():
             ValidarConfiguracaoMonitorService().executar(app.config)
-            # Devices assigned to a remote collector are never probed by the local worker.
             owner = ReservarDispositivoService().executar(dispositivo_id)
             if not owner:
                 return False
             address = Dispositivo.buscar_por_id(dispositivo_id).ip
-            Transacao.encerrar()  # Never keep a database transaction open while probing.
+            Transacao.encerrar()
             try:
                 result = (sonda or SondaIcmpService().executar)(address, app.config['MONITOR_PACKETS'], app.config['MONITOR_TIMEOUT'])
                 device = Dispositivo.buscar_por_id(dispositivo_id)

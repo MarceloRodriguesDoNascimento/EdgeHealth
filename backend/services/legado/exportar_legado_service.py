@@ -1,12 +1,12 @@
+# Caso de uso: exportar registros em quarentena
 import json
 from models import RegistroLegado
 
 
+# Exportação de legado
 class ExportarLegadoService:
-    """Local operator-only export (JSON lines) of quarantined/converted source records."""
-
+    # Grava os registros num arquivo
     def executar(self, destino):
-        # Exclusive creation avoids overwriting an existing file or backup.
         with open(destino, 'x', encoding='utf-8') as stream:
             for record in RegistroLegado.listar_todos():
                 stream.write(json.dumps(dict(tabela=record.tabela, chave=record.chave_original,

@@ -1,3 +1,4 @@
+# Caso de uso: gerar o relatório ZIP com CSVs
 import io
 import json
 import zipfile
@@ -12,17 +13,17 @@ from services.dispositivos.obter_dispositivo_service import ObterDispositivoServ
 from .gerador_csv import GeradorCsv
 
 
+# Exportação de relatório
 class ExportarRelatorioService:
-    """ZIP with devices, samples, incidents (with loss estimate) and diagnoses of a period
-    (default: last 30 days). Returns (file, download name)."""
-
     LIMITE = 50000
 
+    # Confere o limite de linhas
     def _limitado(self, linhas):
         if len(linhas) > self.LIMITE:
             raise UnprocessableEntity('O período contém mais de 50.000 registros. Reduza o intervalo.')
         return linhas
 
+    # Monta os CSVs e o ZIP
     def executar(self, empresa_id, dispositivo_id=None, inicio=None, fim=None):
         start, end = v.period(inicio, fim, 30)
         device_id = v.query_int(dispositivo_id, 'dispositivo_id')
@@ -30,7 +31,6 @@ class ExportarRelatorioService:
         maximo = self.LIMITE + 1
         devices = self._limitado(RelatorioRepository.dispositivos(empresa_id, device_id, maximo))
         metrics = self._limitado(RelatorioRepository.metricas(empresa_id, device_id, start, end, maximo))
-        # Include incidents overlapping the selected interval, not only newly opened ones.
         failures = self._limitado(RelatorioRepository.falhas_sobrepostas(empresa_id, device_id, start, end, maximo))
         diagnoses = self._limitado(RelatorioRepository.diagnosticos([f.id for f in failures], maximo))
         company = Empresa.buscar_por_id(empresa_id)

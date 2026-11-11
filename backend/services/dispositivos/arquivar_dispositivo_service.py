@@ -1,3 +1,4 @@
+# Caso de uso: arquivar dispositivo
 from werkzeug.exceptions import Conflict
 from models import utcnow
 from repositories import FalhaRepository, Transacao
@@ -5,9 +6,9 @@ from services.diagnosticos.atualizar_diagnosticos_service import AtualizarDiagno
 from .obter_dispositivo_service import ObterDispositivoService
 
 
+# Arquivamento
 class ArquivarDispositivoService:
-    """Stops monitoring the device, keeping its history; an open incident is closed by archiving."""
-
+    # Para de monitorar e encerra a falha aberta
     def executar(self, empresa_id, id):
         device = ObterDispositivoService().buscar(empresa_id, id, incluir_arquivados=False)
         if device.em_coleta(utcnow()):

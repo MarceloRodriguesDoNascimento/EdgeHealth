@@ -1,12 +1,12 @@
+# Leitura do banco do protótipo antigo
 import sqlite3
 
 
+# Consultas no banco antigo
 class LegadoRepository:
-    """Read-only access to the prototype SQLite database being imported."""
-
+    # Lê as tabelas do protótipo
     @staticmethod
     def ler_prototipo(origem):
-        """{table: [rows as dict]} of every user table, read in one read-only transaction."""
         connection = sqlite3.connect(origem.as_uri() + '?mode=ro', uri=True)
         connection.row_factory = sqlite3.Row
         try:

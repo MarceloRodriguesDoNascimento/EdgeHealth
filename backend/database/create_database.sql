@@ -1,27 +1,9 @@
--- =====================================================================================
--- EdgeHealth: criação do banco de dados SQLite e de todas as tabelas
--- =====================================================================================
--- Arquivo GERADO a partir das migrations Alembic (backend/migrations/versions); não edite
--- à mão. Para regenerar depois de criar uma migration:
---     cd backend && python database/gerar_create_database.py
--- (tests/test_database_script.py falha se este script ficar diferente das migrations.)
---
--- Uso, em um arquivo de banco NOVO e vazio:
---     cd backend
---     sqlite3 instance/edgehealth.db < database/create_database.sql
---
--- O banco criado já registra a revisão atual em alembic_version, então
--- "flask db upgrade" o reconhece e aplicará somente migrations futuras.
--- Tipos: SQLite usa afinidade de tipo; VARCHAR(n) documenta o limite validado pela
--- aplicação. Valores monetários são texto decimal exato (ex.: '3000.00'), nunca float.
--- Datas são UTC no formato 'AAAA-MM-DD HH:MM:SS.ffffff'.
--- =====================================================================================
+-- Criação de todas as tabelas do banco SQLite
 
 PRAGMA foreign_keys = ON;
 
 BEGIN TRANSACTION;
 
--- empresas
 CREATE TABLE empresas (
     id INTEGER NOT NULL,
     nome_fantasia VARCHAR(150) NOT NULL,
@@ -42,7 +24,6 @@ CREATE TABLE empresas (
     CONSTRAINT uq_empresas_cnpj UNIQUE (cnpj)
 );
 
--- usuarios
 CREATE TABLE usuarios (
     id INTEGER NOT NULL,
     empresa_id INTEGER NOT NULL,
@@ -62,7 +43,6 @@ CREATE TABLE usuarios (
 );
 CREATE INDEX ix_usuarios_empresa_id ON usuarios (empresa_id);
 
--- auth_sessions
 CREATE TABLE auth_sessions (
     id VARCHAR(64) NOT NULL,
     usuario_id INTEGER NOT NULL,
@@ -74,7 +54,6 @@ CREATE TABLE auth_sessions (
 CREATE INDEX ix_auth_sessions_expires_at ON auth_sessions (expires_at);
 CREATE INDEX ix_auth_sessions_usuario_id ON auth_sessions (usuario_id);
 
--- login_attempts
 CREATE TABLE login_attempts (
     id INTEGER NOT NULL,
     "key" VARCHAR(64) NOT NULL,
@@ -84,7 +63,6 @@ CREATE TABLE login_attempts (
 CREATE INDEX ix_login_attempts_created_at ON login_attempts (created_at);
 CREATE INDEX ix_login_attempts_key ON login_attempts ("key");
 
--- coletores
 CREATE TABLE coletores (
     id INTEGER NOT NULL,
     empresa_id INTEGER NOT NULL,
@@ -107,7 +85,6 @@ CREATE TABLE coletores (
 );
 CREATE INDEX ix_coletores_empresa_id ON coletores (empresa_id);
 
--- dispositivos
 CREATE TABLE dispositivos (
     id INTEGER NOT NULL,
     empresa_id INTEGER NOT NULL,
@@ -143,7 +120,6 @@ CREATE INDEX ix_dispositivos_empresa_id ON dispositivos (empresa_id);
 CREATE INDEX ix_dispositivos_proxima_coleta ON dispositivos (proxima_coleta);
 CREATE UNIQUE INDEX uq_dispositivo_ip_ativo ON dispositivos (empresa_id, ip) WHERE arquivado_em IS NULL;
 
--- metricas
 CREATE TABLE metricas (
     id INTEGER NOT NULL,
     dispositivo_id INTEGER NOT NULL,
@@ -168,7 +144,6 @@ CREATE TABLE metricas (
 CREATE INDEX ix_metricas_dispositivo_data ON metricas (dispositivo_id, coletada_em);
 CREATE UNIQUE INDEX uq_metrica_coletor_amostra ON metricas (coletor_id, amostra_uid);
 
--- falhas
 CREATE TABLE falhas (
     id INTEGER NOT NULL,
     dispositivo_id INTEGER NOT NULL,
@@ -192,7 +167,6 @@ CREATE TABLE falhas (
 CREATE INDEX ix_falhas_dispositivo_inicio ON falhas (dispositivo_id, inicio);
 CREATE UNIQUE INDEX uq_falha_aberta_dispositivo ON falhas (dispositivo_id) WHERE estado = 'ABERTA';
 
--- impactos
 CREATE TABLE impactos (
     id INTEGER NOT NULL,
     falha_id INTEGER NOT NULL,
@@ -207,7 +181,6 @@ CREATE TABLE impactos (
     CONSTRAINT uq_impactos_falha_id UNIQUE (falha_id)
 );
 
--- diagnosticos
 CREATE TABLE diagnosticos (
     id INTEGER NOT NULL,
     falha_id INTEGER NOT NULL,
@@ -223,7 +196,6 @@ CREATE TABLE diagnosticos (
     CONSTRAINT uq_diagnosticos_falha_id UNIQUE (falha_id)
 );
 
--- recomendacoes
 CREATE TABLE recomendacoes (
     id INTEGER NOT NULL,
     regra VARCHAR(50) NOT NULL,
@@ -234,7 +206,6 @@ CREATE TABLE recomendacoes (
     CONSTRAINT uq_recomendacoes_codigo UNIQUE (codigo)
 );
 
--- diagnostico_recomendacoes
 CREATE TABLE diagnostico_recomendacoes (
     diagnostico_id INTEGER NOT NULL,
     recomendacao_id INTEGER NOT NULL,
@@ -243,7 +214,6 @@ CREATE TABLE diagnostico_recomendacoes (
     CONSTRAINT fk_diagnostico_recomendacoes_recomendacao_id_recomendacoes FOREIGN KEY(recomendacao_id) REFERENCES recomendacoes (id) ON DELETE RESTRICT
 );
 
--- registros_legados
 CREATE TABLE registros_legados (
     id INTEGER NOT NULL,
     fonte_sha256 VARCHAR(64) NOT NULL,
@@ -261,19 +231,13 @@ CREATE TABLE registros_legados (
 );
 CREATE INDEX ix_registros_legados_empresa_id ON registros_legados (empresa_id);
 
--- alembic_version
 CREATE TABLE alembic_version (
     version_num VARCHAR(32) NOT NULL,
     CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num)
 );
 
--- Revisão Alembic deste esquema: "flask db upgrade" parte daqui.
 INSERT INTO alembic_version (version_num) VALUES ('d41f0c2a9b7e');
 
--- =====================================================================================
--- Dados iniciais: catálogo de ações corretivas (o mesmo de PopularCatalogoService e do
--- comando "flask seed-catalog"). São recomendações, não medições de rede.
--- =====================================================================================
 INSERT INTO recomendacoes (regra, codigo, titulo, acao) VALUES ('LOCALIZADA', 'local-cabo', 'Verificar conexão e alimentação', 'Verifique alimentação, cabo e porta do dispositivo. Compare com um equipamento que esteja respondendo.');
 INSERT INTO recomendacoes (regra, codigo, titulo, acao) VALUES ('LOCALIZADA', 'local-config', 'Validar configuração', 'Confira IP, máscara e políticas de resposta ICMP do equipamento antes de concluir que há defeito físico.');
 INSERT INTO recomendacoes (regra, codigo, titulo, acao) VALUES ('COMPARTILHADA', 'shared-link', 'Inspecionar infraestrutura compartilhada', 'Verifique os enlaces e equipamentos compartilhados pelos dispositivos afetados. A topologia não é conhecida automaticamente.');

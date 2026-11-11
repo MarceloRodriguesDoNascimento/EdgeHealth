@@ -1,12 +1,13 @@
+// Tela Coletores
 import { el, input, label, form, button, modal, table, badge, date, pageHeader, toast, confirmAction } from '../ui/dom.js';
 import { apiFetch, json } from '../services/api.js';
 
 const STATES = { ATIVO: ['Ativo', 'ONLINE'], DESATUALIZADO: ['Sem contato recente', 'OFFLINE'], NUNCA_CONECTADO: ['Aguardando conexão', 'SEM_COLETA'], REVOGADO: ['Revogado', 'SEM_COLETA'] };
-// Latest GitHub release asset (built by collector/windows/build.ps1); the .exe is never served by this app.
 export const WINDOWS_DOWNLOAD = 'https://github.com/MarceloRodriguesDoNascimento/EdgeHealth/releases/latest/download/EdgeHealthColetor.exe';
+// Selo da situação do coletor
 export const collectorBadge =state => badge(...(STATES[state] || [state, 'SEM_COLETA']));
 
-// The plain credential exists only in this response; the server keeps a hash.
+// Mostra a credencial uma única vez
 function showToken(collector, token) {
   const field = el('input', { value: token, readOnly: true, className: 'mono', 'aria-label': 'Credencial do coletor' });
   modal(`Credencial · ${collector.nome}`, el('div', {},
@@ -18,6 +19,7 @@ function showToken(collector, token) {
     el('p', { className: 'muted small' }, 'No computador da rede monitorada, salve-a em um arquivo com acesso restrito e informe-o ao coletor com --token-file. Consulte collector/README.md.')));
 }
 
+// Monta a tela com a tabela de coletores
 export async function Coletores() {
   const body = el('div'); let load;
   load = async () => {
@@ -39,6 +41,7 @@ export async function Coletores() {
         }), 'ghost danger-text'))
     ])));
   };
+  // Formulário de cadastrar coletor
   const create = () => modal('Cadastrar coletor', close => form([
     label('Nome', input('nome', 'Ex.: Coletor da matriz', { required: true, maxLength: 100 })),
     el('p', { className: 'muted full' }, 'O coletor é instalado em um computador dentro da rede da empresa. Ele mede os dispositivos atribuídos e envia os resultados por HTTPS; nenhuma porta de entrada é aberta na rede.')

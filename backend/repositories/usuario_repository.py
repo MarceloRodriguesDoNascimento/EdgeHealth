@@ -1,19 +1,22 @@
+# Consultas de usuários de uma empresa
 from sqlalchemy import func, select
 from app.extensions import db
 from models import Usuario
 
 
+# Consultas de usuários
 class UsuarioRepository:
-    """Users limited to one company."""
-
+    # Usuários da empresa
     @staticmethod
     def listar_da_empresa(empresa_id):
         return db.session.scalars(select(Usuario).where(Usuario.empresa_id == empresa_id).order_by(Usuario.nome)).all()
 
+    # Um usuário da empresa
     @staticmethod
     def buscar_da_empresa(empresa_id, id):
         return db.session.scalar(select(Usuario).where(Usuario.id == id, Usuario.empresa_id == empresa_id))
 
+    # Quantos administradores ativos a empresa tem
     @staticmethod
     def contar_admins_ativos(empresa_id):
         return db.session.scalar(select(func.count()).select_from(Usuario).where(

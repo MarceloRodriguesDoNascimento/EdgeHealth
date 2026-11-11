@@ -1,3 +1,4 @@
+# Caso de uso: gerar credencial nova para o coletor
 import logging
 from werkzeug.exceptions import Conflict
 from models import utcnow
@@ -8,9 +9,9 @@ from .obter_coletor_service import ObterColetorService
 log = logging.getLogger(__name__)
 
 
+# Troca de credencial
 class RotacionarCredencialColetorService:
-    """New credential for the collector; the previous one stops working immediately."""
-
+    # Gera credencial nova e invalida a antiga
     def executar(self, empresa_id, id):
         c = ObterColetorService().executar(empresa_id, id)
         if c.revogado_em:

@@ -1,3 +1,4 @@
+# Caso de uso: gravar uma medição e abrir ou fechar falhas
 import logging
 from models import Falha, Impacto, Metrica, utcnow
 from repositories import FalhaRepository, Transacao
@@ -7,20 +8,13 @@ from .classificar_status_service import ClassificarStatusService
 log = logging.getLogger(__name__)
 
 
+# Registro de medição
 class RegistrarMedicaoService:
-    """Single pipeline of every measurement (local worker and remote collector): sample, status,
-    incident lifecycle, severity and diagnosis.
-
-    Caller owns transaction and device lease. No network I/O here.
-    origem: optional dict(coletor_id, amostra_uid, recebida_em) for remotely ingested samples.
-    """
-
+    # Grava a métrica, atualiza o status e as falhas
     def executar(self, dispositivo, resultado, observado_em=None, origem=None):
         now = observado_em or utcnow()
         origem = origem or {}
         if dispositivo.ultima_coleta and now <= dispositivo.ultima_coleta:
-            # A delayed sample is preserved as history but cannot rewind the state machine,
-            # reopen a closed incident or count towards confirmations.
             return Metrica(dispositivo_id=dispositivo.id, coletada_em=now, respondeu=bool(resultado.received),
                            latencia_ms=resultado.latency_ms, pacotes_enviados=resultado.sent, pacotes_recebidos=resultado.received,
                            perda_pacotes_pct=resultado.loss, status=ClassificarStatusService.instantaneo(resultado),
@@ -41,7 +35,6 @@ class RegistrarMedicaoService:
                                 descricao='Anomalia detectada por teste de conectividade.').salvar(commit=False)
                 Impacto(falha_id=current.id).salvar(commit=False)
                 log.info('Ocorrência aberta dispositivo=%s falha=%s', dispositivo.id, current.id)
-            # Preserve worst condition observed in the same occurrence.
             if kind == 'INDISPONIBILIDADE':
                 current.tipo = kind
             current.ultima_observacao = now

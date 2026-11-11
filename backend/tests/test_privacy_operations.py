@@ -1,3 +1,4 @@
+# Testes das operações de privacidade
 import json
 import sqlite3
 from datetime import timedelta
@@ -19,20 +20,20 @@ def test_retention_purges_old_samples_but_keeps_incidents(app, device):
     assert preview.exit_code == 0 and json.loads(preview.output)['metricas'] == 1
     with app.app_context():
         assert db.session.scalar(select(func.count()).select_from(Metrica)) == 2
-    assert runner.invoke(args=['purge-history', '--days', '10']).exit_code != 0  # below the safety floor
+    assert runner.invoke(args=['purge-history', '--days', '10']).exit_code != 0
     assert json.loads(runner.invoke(args=['purge-history']).output)['metricas'] == 1
     with app.app_context():
         assert db.session.scalar(select(func.count()).select_from(Metrica)) == 1
         failure = db.session.scalar(select(Falha))
-        assert failure is not None  # incident history is not part of the raw-sample retention
+        assert failure is not None
 
 
 def test_anonymization_keeps_company_history(app, signed):
     h = auth_headers(signed)
     signed.post('/api/usuarios', json={'nome': 'Maria Técnica', 'email': 'maria@a.example', 'senha': 'senha-tecnica-1'}, headers=h)
     runner = app.test_cli_runner()
-    assert runner.invoke(args=['anonymize-user', '--email', 'maria@a.example']).exit_code != 0  # requires --yes
-    assert runner.invoke(args=['anonymize-user', '--email', 'admin@a.example', '--yes']).exit_code != 0  # sole admin
+    assert runner.invoke(args=['anonymize-user', '--email', 'maria@a.example']).exit_code != 0
+    assert runner.invoke(args=['anonymize-user', '--email', 'admin@a.example', '--yes']).exit_code != 0
     assert runner.invoke(args=['anonymize-user', '--email', 'maria@a.example', '--yes']).exit_code == 0
     with app.app_context():
         user = db.session.scalar(select(Usuario).where(Usuario.anonimizado_em.isnot(None)))

@@ -1,7 +1,10 @@
+// Tela Equipe
 import { el,input,label,form,pageHeader,toast,button,modal,table,badge,select,confirmAction } from '../ui/dom.js';
 import { apiFetch,json } from '../services/api.js';
+// Monta a tela
 export async function Usuarios(session) {
   const body=el('div'); let load;
+  // Formulário de cadastrar ou editar usuário
   const editor=(user=null)=>modal(user?'Editar usuário':'Cadastrar usuário',close=>form([
     label('Nome',input('nome','Nome completo',{required:true,maxLength:100,value:user?.nome||''})),
     label('E-mail',input('email','nome@empresa.com.br',{type:'email',autoComplete:'off',required:true,value:user?.email||''})),

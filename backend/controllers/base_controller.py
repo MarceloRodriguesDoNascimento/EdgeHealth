@@ -1,37 +1,39 @@
+# Classe-mãe dos Controllers: lê a requisição HTTP
 from flask import g, jsonify, request
 from werkzeug.exceptions import BadRequest
 from app import validation as v
 
 
+# Ferramentas comuns para ler a requisição e responder
 class BaseController:
-    """Reads the HTTP request (JSON body, query string, authenticated user) for the controllers."""
-
+    # Lê o corpo JSON com campos permitidos e obrigatórios
     @staticmethod
     def payload(permitidos, obrigatorios=()):
-        """JSON object with only the allowed fields and every required one filled."""
         if not request.is_json:
             raise BadRequest('Envie um objeto JSON.')
         return v.json_object(request.get_json(), permitidos, obrigatorios)
 
+    # Lê o corpo JSON sem validar
     @staticmethod
     def corpo():
-        """Raw JSON body (None if absent or invalid), for a service that must look the resource up
-        before validating the payload (404 of another company comes before 400)."""
         return request.get_json(silent=True) if request.is_json else None
 
+    # Lê um parâmetro da URL
     @staticmethod
     def parametro(nome, padrao=None):
-        """Raw query-string value (validated by the service)."""
         return request.args.get(nome, padrao)
 
+    # Usuário logado nesta requisição
     @staticmethod
     def usuario():
         return g.user
 
+    # Empresa do usuário logado
     @staticmethod
     def empresa_id():
         return g.user.empresa_id
 
+    # Devolve o dicionário como JSON com o código HTTP
     @staticmethod
     def resposta(dados, status=200):
         return jsonify(dados), status

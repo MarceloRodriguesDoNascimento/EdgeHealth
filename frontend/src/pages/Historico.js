@@ -1,5 +1,7 @@
+// Tela Histórico de falhas
 import { el,input,label,select,button,pageHeader,table,badge,date,duration,params,toast,human } from '../ui/dom.js';
 import { apiFetch } from '../services/api.js';
+// Monta a tela
 export async function Historico(){
   const devices=await apiFetch('/dispositivos?arquivados=1');
   const device=select('dispositivo_id',[['','Todos os dispositivos'],...devices.map(d=>[d.id,d.nome])]);
@@ -7,6 +9,7 @@ export async function Historico(){
   const severity=select('severidade',[['','Todas'],...['BAIXA','MEDIA','ALTA','CRITICA'].map(x=>[x,x])]);
   const start=input('inicio','',{type:'date'}),end=input('fim','',{type:'date'});
   const body=el('div'),paging=el('div',{className:'pagination'});let page=1;
+  // Busca a página com os filtros
   const load=async()=>{
     const result=await apiFetch(`/falhas?${params({dispositivo_id:device.value,estado:state.value,severidade:severity.value,inicio:start.value,fim:end.value,pagina:page,limite:25})}`);
     body.replaceChildren(table(['Dispositivo','Tipo','Situação','Severidade','Início','Duração'],result.items.map(f=>[

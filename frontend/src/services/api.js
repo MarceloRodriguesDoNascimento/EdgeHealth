@@ -1,6 +1,8 @@
+// Comunicação do site com o backend
 export class ApiError extends Error {
   constructor(message, status) { super(message); this.status = status; }
 }
+// Chama a API e trata erros e sessão
 export async function apiFetch(path, options = {}) {
   const csrf = document.cookie.split('; ').find(x => x.startsWith('edgehealth_csrf='))?.split('=').slice(1).join('=');
   let response;
@@ -22,4 +24,5 @@ export async function apiFetch(path, options = {}) {
   if (options.download) return response.blob();
   return response.json();
 }
+// Converte objeto em texto JSON
 export const json = data => JSON.stringify(data);

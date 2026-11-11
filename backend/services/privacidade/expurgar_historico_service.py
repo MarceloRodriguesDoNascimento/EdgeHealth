@@ -1,15 +1,12 @@
+# Caso de uso: apagar histórico antigo (LGPD)
 from datetime import timedelta
 from models import utcnow
 from repositories import RetencaoRepository, Transacao
 
 
+# Expurgo de histórico
 class ExpurgarHistoricoService:
-    """Removes raw samples older than the retention period and expired security records.
-
-    Incidents, impacts and diagnoses are kept: diagnoses already store the values of
-    the samples they cite, so the explanation survives the purge of raw samples.
-    """
-
+    # Apaga medições e registros vencidos
     def executar(self, dias, simular=False):
         now = utcnow()
         cutoff = now - timedelta(days=dias)

@@ -1,12 +1,14 @@
+// Tela Empresa
 import { el,input,label,form,pageHeader,toast,button,modal,brl,moneyInput } from '../ui/dom.js';
 import { apiFetch,json } from '../services/api.js';
 
 const DAYS=[[1,'Seg'],[2,'Ter'],[3,'Qua'],[4,'Qui'],[5,'Sex'],[6,'Sáb'],[7,'Dom']];
+// Formata número no padrão brasileiro
 const fmt=(n,d=0)=>Number(n).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:2});
 
 const HINT='Informe o salário médio para ver o custo por hora estimado.';
 
-// The server computes the cost per hour (same formula used everywhere); the page only shows the answer.
+// Prévia do custo por hora enquanto digita
 export function costPreview(){
   let seq=0,timer;
   return (salary,factor,hours,show)=>{
@@ -24,6 +26,7 @@ export function costPreview(){
   };
 }
 
+// Monta a tela
 export async function Empresa(session) {
   const company=await apiFetch('/empresa');
   const admin=session.usuario.papel==='ADMIN';
@@ -37,6 +40,7 @@ export async function Empresa(session) {
   return el('section',{},pageHeader('Empresa','Dados da organização e custos usados na estimativa de prejuízo.'),data,costsPanel(company,session,admin));
 }
 
+// Painel de custos
 function costsPanel(company,session,admin){
   const c=company.custos;
   const intro=el('p',{className:'muted'},'Usados para estimar o prejuízo financeiro das falhas: horas de expediente × pessoas afetadas × custo por hora. O resultado é sempre uma estimativa.');
@@ -56,6 +60,7 @@ function costsPanel(company,session,admin){
     DAYS.map(([d,name])=>el('label',{className:'checkbox'},el('input',{type:'checkbox',name:'dias',value:String(d),checked:c.expediente.dias.includes(d)}),name)));
   const preview=el('p',{className:'cost-preview full',role:'status','aria-live':'polite'});
   const ask=costPreview();
+  // Atualiza a prévia do custo
   const update=()=>ask(salary.value,factor.value,hours.value,text=>{preview.textContent=text;});
   [salary,factor,hours].forEach(i=>i.addEventListener('input',update));update();
   const node=form([
@@ -75,11 +80,12 @@ function costsPanel(company,session,admin){
   return el('div',{className:'panel narrow',id:'custos'},el('h2',{},'Custos'),intro,node);
 }
 
-// Offered once to the administrator right after creating the company; "skip" is remembered.
+// Assistente de custos do primeiro acesso
 export function costAssistant(session,onDone=()=>{}){
   let decided=false;
   const salary=input('salario_medio','Ex.: 3.000,00',{inputMode:'decimal',autoComplete:'off',required:true});
   const people=input('total_funcionarios','Ex.: 40',{type:'number',inputMode:'numeric',min:0,step:1,required:true});
+  // Pular o assistente
   const skip=async()=>{if(decided)return;decided=true;try{session.empresa=await apiFetch('/empresa/custos/pular',{method:'POST',body:'{}'});}catch(e){toast(e.message,true);}onDone();};
   const dialog=modal('Quer estimar o custo das falhas?',close=>el('div',{},
     el('p',{},'Com o salário médio e o número de funcionários, o EdgeHealth estima quanto cada falha custou em horas paradas. Você pode ajustar tudo depois em Empresa → Custos.'),
@@ -88,6 +94,6 @@ export function costAssistant(session,onDone=()=>{}){
       decided=true;close();toast(`Custos salvos. Custo por hora estimado: ${brl(session.empresa.custos.custo_hora)}.`);onDone();
     }),
     el('div',{className:'actions'},button('Pular, faço depois',()=>{skip();close();},'link'))));
-  dialog.addEventListener('close',()=>skip());  // Esc or "Fechar" also count as "later": never nag again
+  dialog.addEventListener('close',()=>skip());
   return dialog;
 }

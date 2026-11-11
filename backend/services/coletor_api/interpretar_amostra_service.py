@@ -1,12 +1,13 @@
+# Caso de uso: validar uma amostra enviada pelo coletor
 import uuid
 from datetime import datetime, timedelta, timezone
 from flask import current_app
 from services.monitoramento.resultado_sonda import CollectorError, ProbeResult
 
 
+# Validação de amostra
 class InterpretarAmostraService:
-    """Validates one sample sent by a collector. Raises ValueError with the rejection reason."""
-
+    # Converte a data da amostra para UTC
     @staticmethod
     def data_utc(raw):
         if not isinstance(raw, str):
@@ -16,8 +17,8 @@ class InterpretarAmostraService:
             raise ValueError('coletada_em deve informar o fuso (UTC)')
         return value.astimezone(timezone.utc).replace(tzinfo=None)
 
+    # Valida os campos e monta o resultado da medição
     def executar(self, item, agora):
-        """(sample uid, device id, observed at, ProbeResult)."""
         cfg = current_app.config
         if not isinstance(item, dict):
             raise ValueError('amostra deve ser um objeto')

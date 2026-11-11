@@ -1,1 +1,2 @@
-"""Retention, data-subject requests and backups (LGPD technical measures). Operator CLI only."""
+# Services de privacidade (LGPD)
+pass

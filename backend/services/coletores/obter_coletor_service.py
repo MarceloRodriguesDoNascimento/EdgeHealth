@@ -1,10 +1,11 @@
+# Caso de uso: buscar um coletor
 from werkzeug.exceptions import NotFound
 from repositories import ColetorRepository
 
 
+# Busca de coletor
 class ObterColetorService:
-    """Collector of the company or 404 (never reveals collectors of other companies)."""
-
+    # Devolve o coletor ou 404
     def executar(self, empresa_id, id):
         coletor = ColetorRepository.buscar_da_empresa(empresa_id, id)
         if not coletor:

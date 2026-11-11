@@ -1,3 +1,4 @@
+# Caso de uso: explicar a ocorrência com IA (Gemini)
 from flask import current_app
 from werkzeug.exceptions import ServiceUnavailable
 from app import validation as v
@@ -8,14 +9,8 @@ from services.ia.gemini_service import GeminiService
 from services.ia.limite_uso_ia import LimiteUsoIa
 
 
+# Explicação com IA
 class ExplicarFalhaComIaService:
-    """Plain-language explanation of an incident for a non-technical manager, written by an LLM from
-    what the system already computed. The AI explains; it never replaces or changes the rule-based
-    diagnosis.
-
-    Privacy (LGPD): the prompt is built from an ALLOW-list of technical fields only. Names of people
-    or devices, e-mails, CNPJ, IP, company name and free-text notes are never sent."""
-
     INSTRUCAO = (
         'Você é um analista de redes que explica incidentes para um gestor sem conhecimento técnico, em português do Brasil. '
         'Use somente os dados fornecidos; não invente causas, valores ou fatos e não contradiga o diagnóstico do sistema. '
@@ -23,12 +18,14 @@ class ExplicarFalhaComIaService:
         'Responda em texto simples, sem markdown, sem listas com símbolos, com no máximo 180 palavras, '
         'em três parágrafos que começam exatamente com "O que aconteceu:", "Impacto provável:" e "Próximos passos:".')
 
+    # Recebe o serviço do Gemini
     def __init__(self, gemini=None):
         self.gemini = gemini or GeminiService()
 
+    # Confere a falha e o limite e pede o texto à IA
     def executar(self, empresa_id, id, dados):
-        falha = ObterFalhaService().buscar(empresa_id, id)  # 404 of another company before payload errors
-        v.json_object(dados, ())  # the request carries no fields: the prompt is never taken from the client
+        falha = ObterFalhaService().buscar(empresa_id, id)
+        v.json_object(dados, ())
         if not GeminiService.disponivel():
             raise ServiceUnavailable(GeminiService.SEM_CHAVE)
         LimiteUsoIa.registrar(empresa_id, current_app.config['IA_EXPLICACOES_POR_HORA'])
@@ -36,9 +33,9 @@ class ExplicarFalhaComIaService:
         return dict(texto=texto, modelo=current_app.config['GEMINI_MODEL'], gerado_em=iso(utcnow()),
                     aviso='Texto gerado por IA a partir do diagnóstico do sistema; confira antes de agir.')
 
+    # Só os dados técnicos permitidos para a IA
     @staticmethod
     def contexto(falha):
-        """Only technical data (allow-list)."""
         dados = Serializador.falha(falha, True)
         dispositivo = Dispositivo.buscar_por_id(falha.dispositivo_id)
         diag = dados.get('diagnostico') or {}
@@ -58,6 +55,7 @@ class ExplicarFalhaComIaService:
                                     grupo_compartilhado=(prejuizo.get('grupo') or {}).get('valor'))
                                if prejuizo.get('configurado') else 'não configurado pela empresa'))
 
+    # Monta o texto enviado à IA
     @classmethod
     def prompt(cls, falha):
         c = cls.contexto(falha)

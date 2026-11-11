@@ -1,3 +1,4 @@
+# Caso de uso: autenticar o coletor pela credencial
 from flask import current_app
 from werkzeug.exceptions import TooManyRequests, Unauthorized
 from models import Coletor, utcnow
@@ -6,9 +7,9 @@ from services.coletores.credencial_coletor import CredencialColetor
 from services.comum.hash_token import HashToken
 
 
+# Autenticação do coletor
 class AutenticarColetorService:
-    """Bearer credential of a collector plus its per-minute request limit."""
-
+    # Confere a credencial e o limite por minuto
     def executar(self, token):
         c = Coletor.buscar_um_por(token_hash=HashToken.sha256(token)) if token.startswith(CredencialColetor.PREFIXO) else None
         if not c or c.revogado_em:

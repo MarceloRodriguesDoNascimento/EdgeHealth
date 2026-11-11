@@ -1,4 +1,4 @@
-"""Repository layer: only the special queries (the plain CRUD lives in models.base.BaseModel)."""
+# Junta todos os Repositories para importar de um lugar só
 from .transacao import Transacao
 from .autenticacao_repository import AutenticacaoRepository
 from .banco_repository import BancoRepository

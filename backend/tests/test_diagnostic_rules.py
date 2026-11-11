@@ -1,3 +1,4 @@
+# Testes das regras de diagnóstico
 from datetime import timedelta
 from sqlalchemy import select
 from app import db
@@ -26,7 +27,6 @@ def test_localized_and_shared_outage_require_current_peer_evidence(app, device):
             RegistrarMedicaoService().executar(peer, ProbeResult(4, 0, None), now + timedelta(seconds=i + 4))
         assert 'COMPARTILHADA' in rule_codes(failure)
         assert 'LOCALIZADA' not in rule_codes(failure)
-        # Stale or future observations must not support a shared-outage claim.
         peer.ultima_coleta = now - timedelta(hours=1)
         AtualizarDiagnosticosService().executar(first.empresa_id, now + timedelta(seconds=7))
         assert 'COMPARTILHADA' not in rule_codes(failure)
@@ -73,9 +73,6 @@ def test_severity_duration_and_group_boundaries(app, device):
 
 
 def test_shared_outage_survives_peers_recovering_first(app, device):
-    # Regression (lab, falha #6): in a group outage the peers' recovery samples are processed
-    # before the last device's own sample (batch order by device id). The re-analysis in
-    # between must keep COMPARTILHADA, and the group severity must not shrink.
     with app.app_context():
         last = db.session.get(Dispositivo, device['id'])
         peers = []
@@ -88,38 +85,31 @@ def test_shared_outage_survives_peers_recovering_first(app, device):
         db.session.flush()
         now = utcnow() - timedelta(minutes=10)
         group = [*peers, last]
-        for cycle in range(3):  # one collector batch per minute, processed in device order
+        for cycle in range(3):
             at = now + timedelta(minutes=cycle)
             RegistrarMedicaoService().executar(healthy, ProbeResult(4, 4, 1), at)
             for d in group:
                 RegistrarMedicaoService().executar(d, ProbeResult(4, 0, None), at + timedelta(seconds=1))
         failure = db.session.scalar(select(Falha).where(Falha.dispositivo_id == last.id))
         assert 'COMPARTILHADA' in rule_codes(failure) and failure.severidade == 'ALTA'
-        # Next batch: the peers answer again (first good sample, still INSTAVEL) before `last`
-        # is processed, so at that moment `last` is the only device still OFFLINE.
         at = now + timedelta(minutes=3)
         RegistrarMedicaoService().executar(healthy, ProbeResult(4, 4, 1), at)
         for p in peers:
             RegistrarMedicaoService().executar(p, ProbeResult(4, 4, 1), at + timedelta(seconds=1))
         assert {p.status for p in peers} == {'INSTAVEL'} and last.status == 'OFFLINE'
         assert 'COMPARTILHADA' in rule_codes(failure)
-        # The peers recover completely (incidents closed) while `last` is still down.
         for p in peers:
             RegistrarMedicaoService().executar(p, ProbeResult(4, 4, 1), at + timedelta(seconds=30))
         assert all(db.session.scalar(select(Falha).where(Falha.dispositivo_id == p.id)).estado == 'ENCERRADA' for p in peers)
         RegistrarMedicaoService().executar(last, ProbeResult(4, 0, None), at + timedelta(seconds=31))
         assert 'COMPARTILHADA' in rule_codes(failure)
         assert failure.severidade == 'ALTA' and failure.justificativa['dispositivos_afetados'] == 4
-        # Its own recovery then preserves that explanation in the closed incident.
         for s in (40, 50):
             RegistrarMedicaoService().executar(last, ProbeResult(4, 4, 1), at + timedelta(seconds=s))
         assert failure.estado == 'ENCERRADA' and 'COMPARTILHADA' in rule_codes(failure)
 
 
 def test_reanalysis_without_recent_samples_keeps_diagnosis(app, device):
-    # Regression (lab, falha #11): after a collector outage, the first samples of other devices
-    # re-analyse every open incident; a device whose last sample is older than the window must
-    # keep its diagnosis instead of turning into EVIDENCIA_INSUFICIENTE.
     with app.app_context():
         d = db.session.get(Dispositivo, device['id'])
         peer = Dispositivo(empresa_id=d.empresa_id, nome='Outro', ip='127.0.0.2', tipo='Servidor', localizacao='TI')
@@ -133,11 +123,9 @@ def test_reanalysis_without_recent_samples_keeps_diagnosis(app, device):
         diag = db.session.scalar(select(Diagnostico).where(Diagnostico.falha_id == failure.id))
         assert rule_codes(failure) == {'LOCALIZADA'} and diag.estado == 'DISPONIVEL'
         analysed = diag.analisado_em
-        # Collector back 10 minutes later: the peer's sample arrives first.
         RegistrarMedicaoService().executar(peer, ProbeResult(4, 4, 1), now + timedelta(minutes=10))
         assert failure.estado == 'ABERTA'
         assert rule_codes(failure) == {'LOCALIZADA'} and diag.estado == 'DISPONIVEL'
         assert diag.analisado_em == analysed
-        # A real new sample of the device is analysed normally again.
         RegistrarMedicaoService().executar(d, ProbeResult(4, 0, None), now + timedelta(minutes=10, seconds=1))
         assert diag.analisado_em > analysed and rule_codes(failure) == {'LOCALIZADA'}

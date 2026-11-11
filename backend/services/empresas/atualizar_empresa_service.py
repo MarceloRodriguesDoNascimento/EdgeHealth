@@ -1,9 +1,12 @@
+# Caso de uso: alterar dados da empresa
 from app import validation as v
 from models import Empresa
 from services.comum.serializador import Serializador
 
 
+# Edição da empresa
 class AtualizarEmpresaService:
+    # Valida e grava nome, CNPJ, e-mail e telefone
     def executar(self, empresa_id, dados):
         company = Empresa.buscar_por_id(empresa_id)
         if 'nome_fantasia' in dados: company.nome_fantasia = v.string(dados['nome_fantasia'], 'Empresa')

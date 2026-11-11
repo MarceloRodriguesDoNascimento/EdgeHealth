@@ -1,3 +1,4 @@
+# Arquivos que o Docker ignora ao montar a imagem
 .git
 **/__pycache__
 **/*.pyc

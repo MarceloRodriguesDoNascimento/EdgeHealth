@@ -1,3 +1,4 @@
+# Preparação comum dos testes do backend
 import sys
 from pathlib import Path
 import pytest

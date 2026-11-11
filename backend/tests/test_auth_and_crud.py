@@ -1,3 +1,4 @@
+# Testes de login e CRUD
 import pytest
 from sqlalchemy import select,text
 from werkzeug.security import check_password_hash
@@ -35,7 +36,6 @@ def test_company_and_user_form_contract(signed,app):
     tech=app.test_client()
     login=tech.post('/api/auth/login',json={'email':'tecnico@a.example','senha':'outra-senha-123'})
     assert login.status_code==200 and login.json['usuario']['termos_pendentes']
-    # Accounts created by an administrator accept the Terms themselves before using the API.
     assert tech.get('/api/dispositivos').status_code==403
     assert tech.post('/api/auth/aceite-termos',json={'aceite_termos':False},headers=auth_headers(tech)).status_code==400
     accepted=tech.post('/api/auth/aceite-termos',json={'aceite_termos':True},headers=auth_headers(tech))
@@ -63,13 +63,12 @@ def test_device_crud_and_operational_fields(signed,device,app):
 def test_restore_archived_device(signed,device,app):
     h=auth_headers(signed)
     id=device['id']
-    assert signed.post(f'/api/dispositivos/{id}/desarquivar',json={},headers=h).status_code==409  # not archived
+    assert signed.post(f'/api/dispositivos/{id}/desarquivar',json={},headers=h).status_code==409
     with app.app_context():
         d=db.session.get(Dispositivo,id)
         d.status,d.falhas_consecutivas='OFFLINE',3
         db.session.commit()
     assert signed.delete(f'/api/dispositivos/{id}',headers=h).status_code==204
-    # Same rules as the other device routes: CSRF and current Terms are required.
     assert signed.post(f'/api/dispositivos/{id}/desarquivar',json={}).status_code==403
     restored=signed.post(f'/api/dispositivos/{id}/desarquivar',json={},headers=h)
     assert restored.status_code==200
@@ -79,7 +78,7 @@ def test_restore_archived_device(signed,device,app):
         d=db.session.get(Dispositivo,id)
         assert d.falhas_consecutivas==0 and d.proxima_coleta<=utcnow()
     from services.monitoramento import ExecutarCicloMonitoramentoService, ProbeResult
-    assert ExecutarCicloMonitoramentoService().executar(app,lambda *_:ProbeResult(4,4,1))==1  # monitored again
+    assert ExecutarCicloMonitoramentoService().executar(app,lambda *_:ProbeResult(4,4,1))==1
 
 
 def test_restore_respects_tenant_ip_and_terms(signed,device,app):
@@ -89,14 +88,13 @@ def test_restore_respects_tenant_ip_and_terms(signed,device,app):
     other=app.test_client()
     assert register(other,email='admin@b.example',cnpj='11444777000161',name='Empresa B').status_code==201
     assert other.post(f'/api/dispositivos/{id}/desarquivar',json={},headers=auth_headers(other)).status_code==404
-    # A new active device took the same IP: restoring would violate the unique active IP.
     assert signed.post('/api/dispositivos',json={'nome':'Novo','ip':device['ip'],'tipo':'Servidor','localizacao':'TI'},headers=h).status_code==201
     conflict=signed.post(f'/api/dispositivos/{id}/desarquivar',json={},headers=h)
     assert conflict.status_code==409 and 'IP' in conflict.json['erro']
     signed.post('/api/usuarios',json={'nome':'Tec','email':'tec@a.example','senha':'senha-tecnico-1'},headers=h)
     tech=app.test_client()
     tech.post('/api/auth/login',json={'email':'tec@a.example','senha':'senha-tecnico-1'})
-    assert tech.post(f'/api/dispositivos/{id}/desarquivar',json={},headers=auth_headers(tech)).status_code==403  # Terms pending
+    assert tech.post(f'/api/dispositivos/{id}/desarquivar',json={},headers=auth_headers(tech)).status_code==403
     with app.app_context(): assert db.session.get(Dispositivo,id).arquivado_em is not None
 
 

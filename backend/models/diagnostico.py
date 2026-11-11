@@ -1,8 +1,10 @@
+# Model do diagnóstico lógico de uma falha
 from sqlalchemy import CheckConstraint
 from app.extensions import db
 from .base import BaseModel, utcnow
 
 
+# Tabela diagnosticos
 class Diagnostico(BaseModel):
     __tablename__ = 'diagnosticos'
     id = db.Column(db.Integer, primary_key=True)

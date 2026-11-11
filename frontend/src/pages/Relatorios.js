@@ -1,5 +1,7 @@
+// Tela Relatórios
 import { el,input,label,select,form,pageHeader,toast } from '../ui/dom.js';
 import { apiFetch } from '../services/api.js';
+// Monta a tela de exportação
 export async function Relatorios(){
   const devices=await apiFetch('/dispositivos?arquivados=1');
   return el('section',{},pageHeader('Relatórios','Exporte o inventário, as medições e a análise das ocorrências.'),el('div',{className:'panel narrow'},

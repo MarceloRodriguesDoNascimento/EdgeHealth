@@ -1,4 +1,4 @@
-"""The remote collector client against a real HTTP server running the API."""
+# Testes do programa coletor
 import os
 import sys
 import threading
@@ -11,7 +11,7 @@ from models import Metrica, Falha, Dispositivo
 from conftest import auth_headers
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'collector'))
-import edgehealth_collector as ec  # noqa: E402
+import edgehealth_collector as ec
 
 
 @pytest.fixture
@@ -39,7 +39,6 @@ class Clock:
 
 
 def fake_measure(state):
-    """Controlled replacement for ICMP in automated tests only."""
     def fn(device, packets, timeout):
         if state['mode'] == 'denied':
             return None, dict(dispositivo_id=device['id'], tipo='PERMISSAO_ICMP', mensagem='Operation not permitted')
@@ -63,7 +62,6 @@ def test_outage_queue_retry_and_incident_cycle(app, server, remote, device, tmp_
     collector = ec.Collector(ec.Api(server, remote['token'], timeout=3), queue, 1, fake_measure(state), clock)
     collector.step()
     assert count(app, Metrica) == 1 and len(queue) == 0
-    # API unreachable: measurements continue and wait on disk.
     collector.api.base = 'http://127.0.0.1:9'
     state['mode'] = 'down'
     for _ in range(3):
@@ -71,7 +69,6 @@ def test_outage_queue_retry_and_incident_cycle(app, server, remote, device, tmp_
         collector.step()
     assert len(queue) >= 1 and collector.backoff >= 2
     assert (tmp_path / 'fila.jsonl').read_text().count('\n') == len(queue)
-    # Restart from disk (process restart) and reconnect.
     collector2 = ec.Collector(ec.Api(server, remote['token'], timeout=3), ec.Queue(tmp_path / 'fila.jsonl', 100), 1, fake_measure(state), clock)
     for _ in range(4):
         clock.now += 31
@@ -87,7 +84,6 @@ def test_outage_queue_retry_and_incident_cycle(app, server, remote, device, tmp_
     with app.app_context():
         assert db.session.scalar(select(Falha)).estado == 'ENCERRADA'
         assert db.session.scalar(select(func.count()).select_from(Falha)) == 1
-    # Resending everything already confirmed creates nothing new.
     before = count(app, Metrica)
     collector2.queue.add([dict(id=f'00000000-0000-4000-8000-{1:012d}', dispositivo_id=device['id'],
                                coletada_em=ec.utc_now().isoformat().replace('+00:00', 'Z'), enviados=4, recebidos=4, latencia_ms=1.5)])

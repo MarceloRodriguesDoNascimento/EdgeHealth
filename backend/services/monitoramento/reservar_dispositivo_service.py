@@ -1,3 +1,4 @@
+# Caso de uso: reservar o dispositivo antes de medir
 import secrets
 from datetime import timedelta
 from flask import current_app
@@ -5,14 +6,9 @@ from models import utcnow
 from repositories import DispositivoRepository, Transacao
 
 
+# Reserva de dispositivo
 class ReservarDispositivoService:
-    """Atomically takes the exclusive per-device lease shared by the worker and the ingestion.
-
-    Without `coletor`: lease for the local worker (device not assigned to a collector and due).
-    With `coletor`: lease for an ingestion request of the collector that owns the device.
-    Returns the owner token, or None when another process holds the lease.
-    """
-
+    # Pega a reserva exclusiva
     def executar(self, dispositivo_id, coletor=None):
         now = utcnow()
         owner = secrets.token_hex(16)

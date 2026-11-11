@@ -1,3 +1,4 @@
+# Operações no banco como um todo (saúde e backup)
 import sqlite3
 from pathlib import Path
 from alembic.runtime.migration import MigrationContext
@@ -8,12 +9,11 @@ from app.extensions import db
 MIGRATIONS = Path(__file__).resolve().parents[1] / 'migrations'
 
 
+# Consultas sobre o banco
 class BancoRepository:
-    """Database-level operations: readiness check, location and online SQLite backup."""
-
+    # Confere se o banco responde e está na última migration
     @staticmethod
     def esquema_atualizado():
-        """True when the database answers, every table exists and it is at the migration head."""
         db.session.execute(text('SELECT 1'))
         tabelas = inspect(db.engine).get_table_names()
         scripts = ScriptDirectory(str(MIGRATIONS))
@@ -21,13 +21,14 @@ class BancoRepository:
             atual = set(MigrationContext.configure(connection).get_current_heads())
         return set(db.metadata.tables).issubset(tabelas) and atual == set(scripts.get_heads())
 
+    # Endereço do banco em uso
     @staticmethod
     def url():
         return db.engine.url
 
+    # Copia o banco SQLite e confere a cópia
     @staticmethod
     def copiar_sqlite(origem, destino):
-        """Online copy with sqlite3's backup API; returns the destination integrity_check result."""
         source = sqlite3.connect(origem)
         target = sqlite3.connect(destino)
         try:

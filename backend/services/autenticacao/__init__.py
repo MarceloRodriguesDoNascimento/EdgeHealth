@@ -1,1 +1,2 @@
-"""Login, sessions (cookie + CSRF) and acceptance of the Terms of Use."""
+# Services de login, sessão e termos
+pass

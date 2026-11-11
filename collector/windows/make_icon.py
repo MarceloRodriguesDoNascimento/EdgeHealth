@@ -1,7 +1,8 @@
-"""Draws the collector icon (teal tile with a pulse line, like frontend/public/logo.svg)."""
+# Desenha o ícone do EdgeHealthColetor.exe
 import sys
 from PIL import Image, ImageDraw
 
+# Desenha o ícone num tamanho
 def tile(size):
     s = size / 64
     img = Image.new('RGBA', (size, size), (0, 0, 0, 0))

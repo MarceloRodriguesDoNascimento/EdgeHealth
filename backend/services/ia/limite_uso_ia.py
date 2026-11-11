@@ -1,16 +1,16 @@
+# Limita as explicações com IA por empresa por hora
 import threading
 import time
 from werkzeug.exceptions import TooManyRequests
 
 
+# Limite de uso
 class LimiteUsoIa:
-    """Simple per-company hourly limit, so one company cannot exhaust the free AI quota.
-    Kept in memory: one web worker on the free hosting plan; a restart only resets the counters."""
-
     _janela = 3600
     _usos = {}
     _trava = threading.Lock()
 
+    # Conta um uso ou recusa se passou do limite
     @classmethod
     def registrar(cls, empresa_id, limite, agora=None):
         agora = time.monotonic() if agora is None else agora
@@ -22,13 +22,14 @@ class LimiteUsoIa:
                 raise TooManyRequests(f'Limite de {limite} explicações por hora atingido. Tente novamente em cerca de {minutos} min.')
             cls._usos[empresa_id] = recentes + [agora]
 
+    # Devolve um uso que falhou antes da IA
     @classmethod
     def devolver(cls, empresa_id):
-        """A request that failed before reaching the AI does not count."""
         with cls._trava:
             if cls._usos.get(empresa_id):
                 cls._usos[empresa_id].pop()
 
+    # Zera os contadores
     @classmethod
     def limpar(cls):
         with cls._trava:

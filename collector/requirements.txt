@@ -1,1 +1,2 @@
+# Dependências do coletor
 icmplib==3.0.4

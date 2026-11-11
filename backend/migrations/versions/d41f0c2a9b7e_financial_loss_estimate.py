@@ -1,13 +1,4 @@
-"""financial loss estimate: company costs, device business impact, direct costs
-
-Revision ID: d41f0c2a9b7e
-Revises: bc4dfbaec175
-Create Date: 2026-10-07 13:00:00
-
-Columns are only added (ALTER TABLE ... ADD COLUMN): no table is rebuilt, so the existing
-history is untouched. Required columns carry server defaults for the rows already present.
-Money is stored as exact decimal text (models.DecimalText).
-"""
+# Migration dos campos da estimativa de prejuízo
 from alembic import op
 import sqlalchemy as sa
 
@@ -36,12 +27,14 @@ DEVICE = [
 IMPACT = [sa.Column('custos_diretos', sa.String(length=24), nullable=True)]
 
 
+# Adiciona os campos de custo e impacto
 def upgrade():
     for table, columns in (('empresas', COMPANY), ('dispositivos', DEVICE), ('impactos', IMPACT)):
         for column in columns:
             op.add_column(table, column)
 
 
+# Remove os campos de custo e impacto
 def downgrade():
     for table, columns in (('impactos', IMPACT), ('dispositivos', DEVICE), ('empresas', COMPANY)):
         with op.batch_alter_table(table) as batch:

@@ -1,5 +1,4 @@
-# Builds collector\dist\EdgeHealthColetor.exe (single file, no console, no Python needed).
-# Run from any folder:  powershell -ExecutionPolicy Bypass -File collector\windows\build.ps1
+# Gera o EdgeHealthColetor.exe com PyInstaller
 $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot
 $collector = Split-Path $here -Parent

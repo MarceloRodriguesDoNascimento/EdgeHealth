@@ -1,3 +1,4 @@
+# Caso de uso: histórico de ocorrências
 from werkzeug.exceptions import BadRequest
 from app import validation as v
 from repositories import FalhaRepository
@@ -5,13 +6,12 @@ from services.comum.serializador import Serializador
 from services.dispositivos.obter_dispositivo_service import ObterDispositivoService
 
 
+# Histórico de falhas
 class ListarFalhasService:
-    """Incident history filtered by device, severity, state and period, newest first, paginated.
-    Parameters are the raw query-string texts; they are validated here."""
-
     SEVERIDADES = ('BAIXA', 'MEDIA', 'ALTA', 'CRITICA')
     ESTADOS = ('ABERTA', 'ENCERRADA')
 
+    # Valida os filtros e devolve a página
     def executar(self, empresa_id, dispositivo_id=None, severidade=None, estado=None, inicio=None, fim=None,
                  pagina=None, limite=None):
         device_id = v.query_int(dispositivo_id, 'dispositivo_id')

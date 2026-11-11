@@ -1,9 +1,10 @@
+# Model das sessões de login abertas
 from app.extensions import db
 from .base import BaseModel
 
 
+# Tabela auth_sessions: sessão de login de um usuário
 class AuthSession(BaseModel):
-    """Login session of a user (only the SHA-256 of the cookie token is stored)."""
     __tablename__ = 'auth_sessions'
     id = db.Column(db.String(64), primary_key=True)
     usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id', ondelete='CASCADE'), nullable=False, index=True)

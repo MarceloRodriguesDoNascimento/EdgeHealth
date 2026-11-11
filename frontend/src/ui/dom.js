@@ -1,3 +1,5 @@
+// Funções que montam os elementos da tela
+// Cria um elemento HTML
 export function el(tag, props = {}, ...children) {
   const node = document.createElement(tag);
   for (const [key, value] of Object.entries(props || {})) {
@@ -13,35 +15,44 @@ export function el(tag, props = {}, ...children) {
   }
   return node;
 }
+// Mensagem de nenhum registro
 export const empty = (text = 'Nenhum registro encontrado.') => el('div', { className: 'empty' }, text);
+// Campo com rótulo
 export const label = (text, input) => el('label', { className: 'field' }, el('span', {}, text), input);
+// Caixa de texto
 export const input = (name, placeholder = '', props = {}) => el('input', { name, placeholder, ...props });
+// Botão
 export const button = (text, action, kind = 'secondary', props = {}) => el('button', { type: 'button', className: `button ${kind}`, onclick: action, ...props }, text);
-// API codes stay as they are in the JSON; only what the person reads is translated.
 const NAMES = { ONLINE: 'Online', INSTAVEL: 'Instável', OFFLINE: 'Offline', BAIXA: 'Baixa', MEDIA: 'Média', ALTA: 'Alta', CRITICA: 'Crítica',
   ABERTA: 'Aberta', ENCERRADA: 'Encerrada', INDISPONIBILIDADE: 'Indisponibilidade', INSTABILIDADE: 'Instabilidade',
   LOCALIZADA: 'Problema localizado', COMPARTILHADA: 'Infraestrutura compartilhada', CONGESTIONAMENTO: 'Congestionamento',
   LATENCIA: 'Latência alta', RECORRENTE: 'Falha recorrente', RECUPERACAO: 'O dispositivo voltou a responder', ARQUIVAMENTO: 'O dispositivo foi arquivado' };
+// Traduz códigos da API para a tela
 export const human = code => NAMES[code] || code;
+// Selo colorido de status
 export const badge = (text, kind) => el('span', { className: `badge ${kind || text || 'SEM_COLETA'}` }, text ? human(text) : 'Aguardando coleta');
+// Data no formato brasileiro
 export function date(value) { return value ? new Date(value).toLocaleString('pt-BR') : '—'; }
+// Duração legível
 export function duration(seconds) { const m = Math.floor(seconds / 60); return m >= 60 ? `${Math.floor(m/60)}h ${m%60}min` : `${m}min ${Math.floor(seconds%60)}s`; }
-// Money arrives from the API as exact decimal text ("1234.56"); display only, never recomputed here.
+// Valor em reais
 export function brl(value) { return value === null || value === undefined || value === '' ? '—' : Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
-// "3.000,50", "3000,50" or "3000.50" -> "3000.50" (sent as text; the API keeps it as Decimal). Empty -> null.
+// Converte valor digitado para a API
 export function moneyInput(text) {
   const raw = String(text ?? '').trim().replace(/^R\$\s*/i, '');
   if (!raw) return null;
   return raw.includes(',') ? raw.replace(/\./g, '').replace(',', '.') : raw;
 }
+// Número com vírgula e sufixo
 export function number(value, suffix = '') { return value === null || value === undefined ? '—' : `${Number(value).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}${suffix}`; }
+// Lista de opções
 export function select(name, items, value = '') {
   const node = el('select', { name }, items.map(([key, text]) => el('option', { value: String(key) }, text)));
   node.value = String(value); return node;
 }
-// On narrow screens each row becomes a card (styles.css): data-label carries the column name,
-// and explicit roles keep the table semantics that display:block would drop.
+// Tabela de dados
 export function table(headings, rows) {
+  // Diz se a célula é de ações
   const isActions = cell => Boolean(cell?.classList?.contains('actions'));
   return el('div', { className: 'table-wrap' }, el('table', { role: 'table' },
     el('thead', { role: 'rowgroup' }, el('tr', { role: 'row' }, headings.map(h => el('th', { scope: 'col', role: 'columnheader' }, h)))),
@@ -49,11 +60,13 @@ export function table(headings, rows) {
       ? rows.map(row => el('tr', { role: 'row' }, row.map((cell, i) => el('td', { role: 'cell', 'data-label': headings[i], className: isActions(cell) ? 'cell-actions' : null }, cell))))
       : el('tr', { role: 'row' }, el('td', { role: 'cell', colSpan: headings.length, className: 'cell-empty' }, empty())))));
 }
+// Aviso rápido no canto da tela
 export function toast(message, error = false) {
   const area = document.querySelector('#notifications');
   const node = el('div', { className: `toast ${error ? 'error' : ''}` }, message);
   area.append(node); setTimeout(() => node.remove(), 6000);
 }
+// Formulário com envio e mensagens de erro
 export function form(fields, submitText, onSubmit) {
   const error = el('div', { className: 'form-error', role: 'alert' });
   const submit = el('button', { type: 'submit', className: 'button primary' }, submitText);
@@ -67,19 +80,20 @@ export function form(fields, submitText, onSubmit) {
   }); return node;
 }
 let modalCount = 0;
-// Native <dialog> + showModal(): focus moves into the dialog and Esc closes it.
+// Janela modal
 export function modal(title, content) {
   const previous = document.activeElement;
   const headingId = `modal-title-${++modalCount}`;
   const dialog = el('dialog', { className: 'modal', 'aria-labelledby': headingId });
+  // Fecha a janela
   const close = () => dialog.close();
   dialog.append(el('div', { className: 'modal-heading' }, el('h2', { id: headingId }, title), button('Fechar', close, 'ghost modal-close')));
   dialog.append(typeof content === 'function' ? content(close) : content);
   dialog.addEventListener('close', () => { dialog.remove(); previous?.focus(); }, { once: true });
   document.body.append(dialog); dialog.showModal(); return dialog;
 }
+// Janela de confirmação
 export function confirmAction(title, message, action, confirmText = 'Confirmar', kind = 'danger') {
-  // Initial focus on "Cancelar": Enter right after opening never triggers the action.
   modal(title, close => el('div', {}, el('p', {}, message), el('div', { className: 'actions end' },
     button('Cancelar', close, 'secondary', { autofocus: true }), button(confirmText, async event => {
       const target = event.currentTarget;
@@ -88,11 +102,12 @@ export function confirmAction(title, message, action, confirmText = 'Confirmar',
       catch (e) { toast(e.message, true); target.disabled = false; }
     }, kind))));
 }
+// Título da tela
 export function pageHeader(title, description, actions) {
   return el('header', { className: 'page-heading' }, el('div', {}, el('h1', {}, title), description ? el('p', { className: 'muted' }, description) : null), actions);
 }
+// Monta os parâmetros da URL
 export function params(data) { return new URLSearchParams(Object.entries(data).filter(([,v]) => v !== '' && v !== null && v !== undefined)).toString(); }
-// Line icons drawn on a 24 px grid; static strings only, never user data.
 const ICONS = {
   pulse: 'M3 12h4l3-7 4 14 3-7h4',
   server: 'M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01',
@@ -103,6 +118,7 @@ const ICONS = {
   users: 'M9 11a4 4 0 1 0 0-8a4 4 0 0 0 0 8zM2 21v-1a6 6 0 0 1 6-6h2a6 6 0 0 1 6 6v1M16 3.5a4 4 0 0 1 0 7M18 14.3a6 6 0 0 1 4 5.7v1',
   menu: 'M4 7h16M4 12h16M4 17h16',
 };
+// Ícone do menu
 export function icon(name) {
   const node = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   for (const [key, value] of Object.entries({ viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.7', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', class: 'icon', 'aria-hidden': 'true' })) node.setAttribute(key, value);
@@ -110,7 +126,7 @@ export function icon(name) {
   path.setAttribute('d', ICONS[name]); node.append(path);
   return node;
 }
-// One switch port. As a button it selects a device; as a span it is decorative (sign-in screen).
+// Porta do painel com LED de status
 export const port = (status, props = {}, tag = 'span') => el(tag, { className: `port ${status || 'SEM_COLETA'}`, ...(tag === 'button' ? { type: 'button' } : {}), ...props });
-// Brand logo (public/logo.svg). The image carries the accessible name; adjacent text is aria-hidden.
+// Logo do EdgeHealth
 export const brandLogo = () => el('img', { src: '/logo.svg', alt: 'EdgeHealth', className: 'brand-logo', width: 36, height: 36 });

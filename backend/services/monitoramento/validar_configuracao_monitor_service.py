@@ -1,6 +1,7 @@
+# Recusa configurações de monitoramento inválidas
+# Validação da configuração
 class ValidarConfiguracaoMonitorService:
-    """Refuses limits that would make the measurement or the classification untrustworthy."""
-
+    # Confere os limites do monitoramento
     def executar(self, cfg):
         if not 1 <= cfg['MONITOR_PACKETS'] <= 10 or not 0.1 <= cfg['MONITOR_TIMEOUT'] <= 10:
             raise ValueError('MONITOR_PACKETS deve estar entre 1 e 10 e MONITOR_TIMEOUT entre 0.1 e 10.')

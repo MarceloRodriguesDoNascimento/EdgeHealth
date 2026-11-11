@@ -1,9 +1,4 @@
-"""Disposable HTTP API for DOM integration tests. Not imported by the product.
-
-The only controlled probe lives on stdin in this test runner, never in an HTTP
-endpoint or production configuration. It exercises the actual collection and
-persistence pipeline with deterministic inputs; it does not validate ICMP.
-"""
+# API temporária usada nos testes do frontend
 import json
 import os
 import sys

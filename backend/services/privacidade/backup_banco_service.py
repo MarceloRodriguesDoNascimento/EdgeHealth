@@ -1,10 +1,11 @@
+# Caso de uso: cópia de segurança do banco
 import os
 from repositories import BancoRepository
 
 
+# Backup do banco
 class BackupBancoService:
-    """Consistent online copy of the SQLite database (never overwrites a file)."""
-
+    # Copia o banco sem sobrescrever arquivo existente
     def executar(self, destino):
         url = BancoRepository.url()
         if url.get_backend_name() != 'sqlite' or not url.database:

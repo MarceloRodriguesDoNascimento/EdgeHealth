@@ -1,4 +1,4 @@
-# Ambiente de validação Python 3.12; inclui runtime e ferramentas de teste.
+# Versões travadas das dependências de desenvolvimento
 alembic==1.19.2
 blinker==1.9.0
 click==8.5.0

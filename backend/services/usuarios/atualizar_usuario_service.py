@@ -1,12 +1,13 @@
+# Caso de uso: editar usuário
 from werkzeug.exceptions import NotFound
 from repositories import AutenticacaoRepository, UsuarioRepository
 from services.comum.serializador import Serializador
 from .dados_usuario import DadosUsuario
 
 
+# Edição de usuário
 class AtualizarUsuarioService:
-    """Edits a user of the company; a new password, role change or deactivation ends their sessions."""
-
+    # Valida e grava as alterações
     def executar(self, solicitante, id, dados):
         user = UsuarioRepository.buscar_da_empresa(solicitante.empresa_id, id)
         if not user: raise NotFound('Usuário não encontrado.')

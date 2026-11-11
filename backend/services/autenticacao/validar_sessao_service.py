@@ -1,3 +1,4 @@
+# Caso de uso: validar a sessão em toda rota protegida
 import secrets
 from flask import current_app
 from werkzeug.exceptions import Forbidden, Unauthorized
@@ -5,9 +6,9 @@ from models import AuthSession, Usuario, utcnow
 from services.comum.hash_token import HashToken
 
 
+# Validação de sessão
 class ValidarSessaoService:
-    """Session cookie, CSRF token on writes, current Terms of Use and the admin role."""
-
+    # Confere sessão, CSRF, termos e papel
     def executar(self, token, csrf, metodo, admin=False, termos=True):
         session = AuthSession.buscar_por_id(HashToken.sha256(token)) if token else None
         user = Usuario.buscar_por_id(session.usuario_id) if session else None

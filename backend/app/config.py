@@ -1,9 +1,11 @@
+# Todas as configurações do servidor, lidas do .env
 import os
 from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parents[1] / '.env')
 
+# Valores de configuração (banco, sessão, monitoramento, IA)
 class Config:
     SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL', 'sqlite:///edgehealth.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
@@ -30,16 +32,13 @@ class Config:
     SEVERITY_GROUP_SIZE = 3
     SEVERITY_HIGH_USERS = 10
     SEVERITY_CRITICAL_USERS = 50
-    # Remote collectors (HTTPS ingestion).
     COLLECTOR_STALE_SECONDS = int(os.getenv('COLLECTOR_STALE_SECONDS', '180'))
     COLLECTOR_MAX_BATCH = int(os.getenv('COLLECTOR_MAX_BATCH', '200'))
     COLLECTOR_MAX_REQUESTS_PER_MINUTE = int(os.getenv('COLLECTOR_MAX_REQUESTS_PER_MINUTE', '120'))
     COLLECTOR_MAX_SAMPLE_AGE_HOURS = int(os.getenv('COLLECTOR_MAX_SAMPLE_AGE_HOURS', '24'))
     COLLECTOR_MAX_CLOCK_SKEW_SECONDS = int(os.getenv('COLLECTOR_MAX_CLOCK_SKEW_SECONDS', '120'))
     COLLECTOR_MAX_CONTENT_LENGTH = 512 * 1024
-    # Privacy and operations.
     TERMS_VERSION = os.getenv('TERMS_VERSION', '2026-10')
-    # Optional generative AI (Gemini): plain-language explanation of an incident. No key = disabled.
     GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '').strip()
     GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-3.5-flash-lite').strip()
     GEMINI_TIMEOUT_SECONDS = float(os.getenv('GEMINI_TIMEOUT_SECONDS', '20'))

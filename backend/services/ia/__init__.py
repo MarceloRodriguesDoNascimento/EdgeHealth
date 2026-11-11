@@ -1,1 +1,2 @@
-"""Generative AI integrations (external service, encapsulated in its own Service)."""
+# Integração com a IA (Gemini)
+pass

@@ -1,1 +1,2 @@
-"""Diagnosis rules (severity, probable causes) and the diagnosis/recommendation use cases."""
+# Services de diagnóstico, severidade e recomendações
+pass

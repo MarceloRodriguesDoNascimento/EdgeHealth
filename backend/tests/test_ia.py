@@ -1,5 +1,4 @@
-"""Explain an incident with AI (Gemini): service errors, privacy of the prompt and the route rules.
-No test reaches the internet: a fake transport replaces the HTTP call."""
+# Testes da explicação com IA
 import json
 import socket
 import urllib.error
@@ -48,7 +47,6 @@ def com_chave(app, monkeypatch):
 
 @pytest.fixture
 def falha(app, signed):
-    """Incident with diagnosis, recommendations and personal data that must NEVER reach the AI."""
     r = signed.post('/api/dispositivos', json={'nome': 'PC da Maria Souza', 'ip': '10.9.8.7', 'tipo': 'Roteador',
                                                'localizacao': 'Sala de TI'}, headers=auth_headers(signed))
     with app.app_context():
@@ -67,8 +65,6 @@ def falha(app, signed):
 def explicar(client, fid):
     return client.post(f'/api/falhas/{fid}/explicacao-ia', json={}, headers=auth_headers(client))
 
-
-# --- GeminiService ---------------------------------------------------------------------------
 
 def test_gemini_sends_the_key_in_a_header_and_returns_only_the_answer_text(app, com_chave):
     with app.app_context():
@@ -110,8 +106,6 @@ def test_gemini_without_key_never_calls_the_api(app):
     assert fake.chamadas == []
 
 
-# --- Privacy of the prompt -------------------------------------------------------------------
-
 def test_prompt_has_the_diagnosis_but_no_personal_or_identifying_data(app, com_chave, falha):
     with app.app_context():
         prompt = ExplicarFalhaComIaService.prompt(db.session.get(Falha, falha))
@@ -124,8 +118,6 @@ def test_prompt_has_the_diagnosis_but_no_personal_or_identifying_data(app, com_c
         assert esperado in prompt, esperado
     assert empresa.ip not in prompt
 
-
-# --- Route -----------------------------------------------------------------------------------
 
 def test_explanation_returns_the_text_and_the_warning(signed, com_chave, falha):
     detalhe = signed.get(f'/api/falhas/{falha}').json
@@ -160,7 +152,7 @@ def test_hourly_limit_per_company_answers_429(app, signed, com_chave, falha):
     r = explicar(signed, falha)
     assert r.status_code == 429 and 'por hora' in r.json['erro']
     assert len(com_chave.chamadas) == 2
-    other = app.test_client()  # the limit is per company
+    other = app.test_client()
     register(other, email='admin@b.example', cnpj='11444777000161', name='Empresa B')
     assert explicar(other, falha).status_code == 404
 

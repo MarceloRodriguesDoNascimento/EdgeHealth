@@ -1,10 +1,11 @@
+# Calcula a situação do coletor
 from flask import current_app
 from models import utcnow
 
 
+# Situação do coletor
 class EstadoColetor:
-    """REVOGADO, NUNCA_CONECTADO, DESATUALIZADO (no recent contact) or ATIVO."""
-
+    # Diz se está ativo, desatualizado, revogado ou nunca conectou
     @staticmethod
     def calcular(coletor, agora=None):
         if coletor.revogado_em:

@@ -1,8 +1,10 @@
+# Model das ocorrências de rede
 from sqlalchemy import CheckConstraint, Index, text
 from app.extensions import db
 from .base import BaseModel
 
 
+# Tabela falhas
 class Falha(BaseModel):
     __tablename__ = 'falhas'
     id = db.Column(db.Integer, primary_key=True)
@@ -27,6 +29,7 @@ class Falha(BaseModel):
         CheckConstraint('fim IS NULL OR fim >= inicio', name='datas'),
     )
 
+    # Fecha a ocorrência com data de fim e motivo
     def encerrar(self, quando, motivo):
         self.estado = 'ENCERRADA'
         self.fim = quando

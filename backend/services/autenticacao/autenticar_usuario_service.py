@@ -1,3 +1,4 @@
+# Caso de uso: login com e-mail e senha
 from datetime import timedelta
 from flask import current_app
 from werkzeug.exceptions import TooManyRequests, Unauthorized
@@ -10,12 +11,11 @@ from .criar_sessao_service import CriarSessaoService, SessaoIniciada
 from .obter_perfil_service import ObterPerfilService
 
 
+# Login com limite de tentativas
 class AutenticarUsuarioService:
-    """E-mail/password login with a rate limit per IP + e-mail."""
-
-    # Equal-cost verification even when an account is absent.
     DUMMY_HASH = generate_password_hash('unused-login-comparison')
 
+    # Confere a senha e abre a sessão
     def executar(self, email, senha, ip):
         email = v.email(email)
         senha = v.password(senha, minimum=1)

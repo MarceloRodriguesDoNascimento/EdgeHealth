@@ -1,7 +1,9 @@
+# Model do catálogo de ações corretivas
 from app.extensions import db
 from .base import BaseModel
 
 
+# Tabela recomendacoes
 class Recomendacao(BaseModel):
     __tablename__ = 'recomendacoes'
     id = db.Column(db.Integer, primary_key=True)

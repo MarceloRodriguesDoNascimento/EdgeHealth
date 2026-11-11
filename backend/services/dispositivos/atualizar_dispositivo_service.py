@@ -1,3 +1,4 @@
+# Caso de uso: editar dispositivo
 from werkzeug.exceptions import Conflict
 from models import utcnow
 from repositories import FalhaRepository
@@ -6,9 +7,9 @@ from .dados_dispositivo import DadosDispositivo
 from .obter_dispositivo_service import ObterDispositivoService
 
 
+# Edição de dispositivo
 class AtualizarDispositivoService:
-    """Edits an active device; a new IP is a new measurement target and restarts its state."""
-
+    # Valida e grava as alterações
     def executar(self, empresa_id, id, dados):
         device = ObterDispositivoService().buscar(empresa_id, id, incluir_arquivados=False)
         if device.em_coleta(utcnow()):

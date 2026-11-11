@@ -1,9 +1,12 @@
+# Controller da exportação do relatório
 from flask import send_file
 from services.relatorios.exportar_relatorio_service import ExportarRelatorioService
 from .base_controller import BaseController
 
 
+# Rota de relatório
 class RelatorioController(BaseController):
+    # GET /api/relatorios/exportar: devolve o ZIP para download
     def exportar(self):
         arquivo, nome = ExportarRelatorioService().executar(
             self.empresa_id(), dispositivo_id=self.parametro('dispositivo_id'),

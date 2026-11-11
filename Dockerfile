@@ -1,5 +1,4 @@
-# EdgeHealth web image: API + built interface served by Waitress on port 8000.
-# The SQLite database lives in the /data volume, which must be persistent.
+# Monta a imagem Docker: compila o site e prepara o servidor Python
 FROM node:22-alpine AS frontend
 WORKDIR /src/frontend
 COPY frontend/package.json frontend/package-lock.json ./

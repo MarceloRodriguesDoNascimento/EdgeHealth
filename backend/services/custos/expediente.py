@@ -1,15 +1,14 @@
+# Calcula quanto da falha caiu dentro do expediente
 from datetime import datetime, time, timedelta, timezone
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 
+# Horário de trabalho da empresa
 class Expediente:
-    """Working hours of the company: only this part of an incident costs productivity."""
-
+    # Segundos dos intervalos dentro do expediente
     @staticmethod
     def segundos_uteis(intervalos, empresa):
-        """Seconds of the (UTC, naive) intervals that fall inside the working hours, without double
-        counting overlaps. Uses the company's time zone, so DST and the local date are respected."""
         tz, utc = ZoneInfo(empresa.fuso), timezone.utc
         days = {int(d) for d in empresa.expediente_dias}
         start_t, end_t = time.fromisoformat(empresa.expediente_inicio), time.fromisoformat(empresa.expediente_fim)

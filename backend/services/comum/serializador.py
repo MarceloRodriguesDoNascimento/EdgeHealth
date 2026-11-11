@@ -1,3 +1,4 @@
+# Converte as entidades no JSON devolvido pela API
 from flask import current_app
 from models import Coletor, Diagnostico, Dispositivo, Impacto, iso, utcnow
 from repositories import DiagnosticoRepository, DispositivoRepository
@@ -7,21 +8,23 @@ from services.custos.estimar_prejuizo_falha_service import EstimarPrejuizoFalhaS
 from services.ia.gemini_service import GeminiService
 
 
+# Conversão para JSON
 class Serializador:
-    """JSON representation of each entity returned by the API (the public contract)."""
-
+    # JSON da empresa com resumo dos custos
     @staticmethod
     def empresa(e):
         result = {k: getattr(e, k) for k in ('id', 'nome_fantasia', 'cnpj', 'email', 'telefone')}
         result['custos'] = CalculadoraPrejuizo.resumo_empresa(e)
         return result
 
+    # JSON do usuário sem a senha
     @staticmethod
     def usuario(u):
         result = {k: getattr(u, k) for k in ('id', 'nome', 'email', 'empresa_id', 'papel', 'ativo', 'termos_versao')}
         result['termos_pendentes'] = u.termos_versao != current_app.config['TERMS_VERSION']
         return result
 
+    # JSON do dispositivo com o estado atual
     @staticmethod
     def dispositivo(d):
         result = {k: getattr(d, k) for k in ('id', 'empresa_id', 'nome', 'ip', 'tipo', 'localizacao', 'status', 'latencia_ms', 'perda_pacotes_pct', 'erro_coleta', 'coletor_id',
@@ -36,16 +39,19 @@ class Serializador:
             result.update(coletor=None, coletor_estado=None)
         return result
 
+    # JSON da medição
     @staticmethod
     def metrica(m):
         result = {k: getattr(m, k) for k in ('id', 'dispositivo_id', 'respondeu', 'latencia_ms', 'pacotes_enviados', 'pacotes_recebidos', 'perda_pacotes_pct', 'status', 'coletor_id', 'fora_de_ordem')}
         result.update(coletada_em=iso(m.coletada_em), recebida_em=iso(m.recebida_em))
         return result
 
+    # JSON da recomendação
     @staticmethod
     def recomendacao(r):
         return {k: getattr(r, k) for k in ('id', 'regra', 'codigo', 'titulo', 'acao')}
 
+    # JSON do diagnóstico com recomendações
     @classmethod
     def diagnostico(cls, diag):
         if not diag:
@@ -55,6 +61,7 @@ class Serializador:
                     evidencias=diag.evidencias, estado=diag.estado, analisado_em=iso(diag.analisado_em),
                     versao_regras=diag.versao_regras, recomendacoes=[cls.recomendacao(r) for r in recs])
 
+    # JSON da ocorrência com duração e impacto
     @classmethod
     def falha(cls, f, detalhe=False):
         device = Dispositivo.buscar_por_id(f.dispositivo_id)
@@ -73,6 +80,7 @@ class Serializador:
             result['ia_disponivel'] = GeminiService.disponivel()
         return result
 
+    # JSON do coletor com a situação
     @staticmethod
     def coletor(c):
         return dict(id=c.id, nome=c.nome, token_prefixo=c.token_prefixo, estado=EstadoColetor.calcular(c),

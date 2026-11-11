@@ -1,4 +1,4 @@
-"""Layered architecture rules: Controller -> Service -> Model/Repository -> database."""
+# Testes da arquitetura em camadas
 import ast
 from pathlib import Path
 import models
@@ -14,7 +14,6 @@ def sources(layer):
 
 
 def imported_names(tree):
-    """(module, name) of every import; name is None for `import module`."""
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
@@ -64,7 +63,6 @@ def test_base_model_has_the_five_crud_operations():
 
 
 def test_each_controller_method_calls_a_single_service():
-    """A controller method only translates HTTP: one use case per request, the coordination is in the service."""
     problems = []
     for path, tree in sources('controllers'):
         for method in (n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)):

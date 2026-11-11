@@ -1,1 +1,2 @@
-"""Monitored devices: inventory, archiving, measurement origin and business impact."""
+# Services do inventário de dispositivos
+pass

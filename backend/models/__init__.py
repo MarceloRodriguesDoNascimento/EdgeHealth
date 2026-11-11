@@ -1,4 +1,4 @@
-"""Model layer: one file per entity, all inheriting the CRUD of models.base.BaseModel."""
+# Junta todos os Models para importar de um lugar só
 from .base import BaseModel, DecimalText, iso, utcnow
 from .empresa import Empresa
 from .usuario import Usuario

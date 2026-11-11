@@ -1,11 +1,12 @@
+# Caso de uso: dizer ao coletor o que medir
 from flask import current_app
 from models import iso, utcnow
 from repositories import DispositivoRepository
 
 
+# Configuração do coletor
 class ObterConfiguracaoColetorService:
-    """What the collector must measure, how and how often."""
-
+    # Lista dispositivos, pacotes e intervalo
     def executar(self, coletor):
         cfg = current_app.config
         return dict(coletor_id=coletor.id, servidor_em=iso(utcnow()), intervalo_segundos=cfg['MONITOR_INTERVAL'],

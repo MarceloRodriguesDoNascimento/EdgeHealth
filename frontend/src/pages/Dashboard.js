@@ -1,3 +1,4 @@
+// Tela Visão da rede
 import Chart from 'chart.js/auto';
 import { el,label,input,select,button,pageHeader,badge,table,date,number,empty,params,toast,brl,port } from '../ui/dom.js';
 import { apiFetch } from '../services/api.js';
@@ -6,9 +7,10 @@ import { collectorBadge } from './Coletores.js';
 const FONT='"Archivo Variable",ui-sans-serif,system-ui,sans-serif';
 const STATUS={ONLINE:'online',INSTAVEL:'instável',OFFLINE:'offline',SEM_COLETA:'aguardando a primeira medição'};
 
-// The headline of the panel: the state of the network in one plain sentence, worst news first.
+// Frase de resumo da rede
 export function networkSummary(i){
   if(!i.total)return 'Cadastre o primeiro dispositivo para começar a monitorar.';
+  // Singular ou plural de dispositivo
   const noun=n=>n===1?'dispositivo':'dispositivos',wait=n=>n===1?'aguarda':'aguardam';
   const problems=[i.offline?`${i.offline} offline`:null,i.instaveis?`${i.instaveis} ${i.instaveis===1?'instável':'instáveis'}`:null].filter(Boolean);
   if(problems.length){const first=i.offline||i.instaveis;return `${first} ${noun(first)} ${problems.join(' e ').replace(/^\d+ /,'')} agora.`;}
@@ -17,6 +19,7 @@ export function networkSummary(i){
   return i.total===1?'O dispositivo está online.':`Todos os ${i.total} dispositivos estão online.`;
 }
 
+// Monta a tela
 export async function Dashboard(onDispose) {
   const initial=await apiFetch('/dashboard');
   const device=select('dispositivo_id',[['','Selecione um dispositivo'],...initial.dispositivos.map(d=>[d.id,d.nome])],initial.dispositivo_id||'');
@@ -25,11 +28,12 @@ export async function Dashboard(onDispose) {
   const cards=el('div',{className:'stats-grid'}),severity=el('div',{className:'severity-list'}),collectors=el('div',{className:'severity-list'}),recent=el('div'),costs=el('div',{className:'cost-summary'}),time=el('span',{className:'muted small'}),sampleInfo=el('p',{className:'muted small'});
   const latency=el('canvas',{'aria-label':'Histórico de latência',role:'img'}),loss=el('canvas',{'aria-label':'Histórico de perda de pacotes',role:'img'});
   let charts=[]; let stopped=false; let requestId=0;
-  // Fewer x-axis labels on narrow charts (about one per 90 px); recalculated on resize and rotation.
+  // Quantidade de marcas no eixo dos gráficos
   const ticks=canvas=>Math.max(3,Math.min(6,Math.floor((canvas.parentElement?.clientWidth||360)/90)));
+  // Ajusta os gráficos ao redimensionar
   const onResize=()=>charts.forEach(c=>{const limit=ticks(c.canvas);if(c.options.scales.x.ticks.maxTicksLimit!==limit){c.options.scales.x.ticks.maxTicksLimit=limit;c.update('none');}});
+  // Desenha resumo, portas e cartões
   const drawContent=(data)=>{
-    // Refreshed every 15 s: announce the headline only when it changes and keep keyboard focus on the same port.
     const summary=networkSummary(data.indicadores);if(headline.textContent!==summary)headline.textContent=summary;
     const focused=ports.contains(document.activeElement)?document.activeElement.dataset.device:null;
     ports.replaceChildren(...data.dispositivos.map(d=>{const state=d.status||'SEM_COLETA',text=`${d.nome}: ${STATUS[state]||state}`;
@@ -45,13 +49,16 @@ export async function Dashboard(onDispose) {
       el('a',{href:`#falha/${f.id}`,className:'text-link'},f.dispositivo),badge(f.estado,f.estado==='ABERTA'?'INSTAVEL':'ONLINE'),badge(f.severidade),date(f.inicio)
     ])):empty('Nenhuma ocorrência registrada. Novas falhas aparecerão aqui.'));
   };
+  // Desenha os gráficos de latência e perda
   const drawCharts=(data)=>{
     charts.forEach(c=>c.destroy());charts=[];
     for(const [canvas,key,title,color,max] of [[latency,'latencia_ms','Latência (ms)','#1c3fab',undefined],[loss,'perda_pacotes_pct','Perda (%)','#b3201f',100]]){
       charts.push(new Chart(canvas,{type:'line',data:{labels:data.serie.map(m=>new Date(m.coletada_em).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})),datasets:[{label:title,data:data.serie.map(m=>m[key]),borderColor:color,backgroundColor:color+'14',borderWidth:1.75,fill:true,tension:0.2,pointRadius:data.serie.length<40?2:0,spanGaps:false}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false},tooltip:{callbacks:{title:items=>items.length?date(data.serie[items[0].dataIndex].coletada_em):''}}},scales:{x:{grid:{display:false},border:{color:'#d6dae4'},ticks:{color:'#505a6e',font:{family:FONT,size:12},maxTicksLimit:ticks(canvas),maxRotation:0,autoSkipPadding:12}},y:{beginAtZero:true,max,grid:{color:'#e7e9f0'},border:{display:false},ticks:{color:'#505a6e',font:{family:FONT,size:12},maxTicksLimit:6}}}}}));
     }
   };
+  // Desenha tudo
   const draw=data=>{drawContent(data);drawCharts(data);};
+  // Busca os dados de novo
   const refresh=async()=>{const own=++requestId;try{const data=await apiFetch(`/dashboard?${params({dispositivo_id:device.value,inicio:start.value,fim:end.value})}`);if(!stopped&&own===requestId)draw(data);}catch(e){if(!stopped&&own===requestId)toast(e.message,true);}};
   const root=el('section',{},pageHeader('Visão da rede','Disponibilidade, desempenho e ocorrências.',el('div',{className:'actions'},time,button('Atualizar',refresh))),
     el('div',{className:'faceplate'},headline,ports,el('p',{},'Cada porta é um dispositivo. Escolha uma para ver o desempenho dela abaixo.')),cards,
@@ -61,7 +68,6 @@ export async function Dashboard(onDispose) {
     el('div',{className:'bottom-grid'},el('div',{},el('div',{className:'section-heading'},el('h2',{},'Ocorrências recentes'),el('a',{href:'#historico',className:'text-link'},'Ver histórico')),recent),
       el('aside',{},el('div',{className:'panel'},el('h3',{},'Custo estimado das falhas (30 dias)'),costs),el('div',{className:'panel'},el('h3',{},'Severidade das falhas abertas'),severity),
         el('div',{className:'panel'},el('h3',{},'Coletores'),collectors,el('p',{className:'muted small'},'Coletor sem contato recente indica falta de dados, não queda dos dispositivos.')))));
-  // The canvas must be attached before its responsive chart is initialized.
   drawContent(initial);
   setTimeout(()=>{if(!stopped&&requestId===0)drawCharts(initial);},0);
   const timer=setInterval(refresh,15000);
@@ -70,7 +76,7 @@ export async function Dashboard(onDispose) {
   return root;
 }
 
-// Shared outages are already de-duplicated by the API; the ranking adds each device's own estimate.
+// Cartão do custo estimado das falhas
 export function costSummary(c){
   if(!c||!c.configurado)return [el('p',{className:'muted small'},c?.mensagem||'Configure os custos da empresa para ver a estimativa.'),el('a',{href:'#empresa',className:'text-link'},'Configurar custos')];
   return [el('p',{className:'money-hero'},brl(c.total)),

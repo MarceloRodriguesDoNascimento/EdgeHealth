@@ -1,8 +1,4 @@
-"""One-way, read-only import of the prototype database into an empty MVP database.
-
-Unverifiable observations remain in quarantine. They are never passed to the
-collector, dashboard or diagnosis engine as real measurements.
-"""
+# Caso de uso: importar o banco do protótipo antigo
 import base64
 import hashlib
 import secrets
@@ -14,14 +10,16 @@ from models import Dispositivo, Empresa, RegistroLegado, Usuario
 from repositories import BancoRepository, LegadoRepository, Transacao
 
 
+# Importação de legado
 class ImportarLegadoService:
-
+    # Converte valor para JSON
     @staticmethod
     def _json_value(value):
         if isinstance(value, bytes):
             return {'encoding': 'base64', 'value': base64.b64encode(value).decode('ascii')}
         return value
 
+    # Importa empresas, usuários e dispositivos
     def executar(self, origem):
         source = Path(origem).resolve(strict=True)
         destination = BancoRepository.url().database
@@ -43,7 +41,6 @@ class ImportarLegadoService:
         try:
             for table in order:
                 for index, row in enumerate(rows[table]):
-                    # Plaintext passwords from the prototype must not enter the new DB.
                     safe = {key: ('[REMOVIDO: credencial legada]' if any(term in key.lower() for term in ('senha', 'password', 'token', 'secret')) else self._json_value(value)) for key, value in row.items()}
                     tenant = companies.get(row.get('empresa_id'))
                     outcome, reason = 'QUARENTENA', 'Registro histórico do protótipo; origem e método de medição não verificáveis.'
